@@ -141,7 +141,10 @@ window.__ModuleLoader__.load({
 
 .ght-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
 .ght-panel { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 18px; background: var(--dsw-alias-bg-layer-1);
-  padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; flex: 1 1 420px; }
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* Only the chart row splits into columns; a page-level section must keep its
+   natural height, otherwise its flex-basis becomes a height and overlaps. */
+.ght-row > .ght-panel { flex: 1 1 420px; }
 .ght-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .ght-panel-title { margin: 0; font-size: 13.5px; font-weight: 500; color: var(--dsw-alias-label-primary); }
 .ght-hint { font-size: 11.5px; color: var(--dsw-alias-label-tertiary); }
