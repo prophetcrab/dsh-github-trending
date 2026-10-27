@@ -274,6 +274,40 @@ async function fetchSearchFallback() {
 }
 
 /**
+ * Fetch repositories created in the last few days, by stars.
+ * @param days - creation window in days.
+ * @returns repository records shaped like the trending rows, with their age.
+ */
+async function fetchFresh(days) {
+  const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString().slice(0, 10)
+  const url = `${SEARCH_URL}?q=created:>${since}&sort=stars&order=desc&per_page=30`
+  const body = JSON.parse(await curl(url, 'application/vnd.github+json', 30_000))
+  const items = Array.isArray(body?.items) ? body.items : []
+  return items.map(item => {
+    const fullName = String(item.full_name ?? '')
+    const slash = fullName.indexOf('/')
+    const description = String(item.description ?? '')
+    const language = item.language === null || item.language === undefined ? null : String(item.language)
+    const createdAt = String(item.created_at ?? '')
+    const created = Date.parse(createdAt)
+    return {
+      fullName,
+      owner: slash > 0 ? fullName.slice(0, slash) : '',
+      repo: slash > 0 ? fullName.slice(slash + 1) : fullName,
+      description,
+      language,
+      stars: Number(item.stargazers_count ?? 0),
+      forks: Number(item.forks_count ?? 0),
+      starsToday: Number(item.stargazers_count ?? 0),
+      url: String(item.html_url ?? `https://github.com/${fullName}`),
+      domain: classify(fullName, description, language),
+      createdAt,
+      ageDays: Number.isFinite(created) ? Math.max(0, Math.floor((Date.now() - created) / 86_400_000)) : null,
+    }
+  })
+}
+
+/**
  * Ask the model for the day's summary.
  * @param ctx - plugin context (uses its LLM service).
  * @param config - resolved config.
@@ -281,7 +315,7 @@ async function fetchSearchFallback() {
  * @param domains - grouped repositories.
  * @returns the parsed summary, or null when the model refused prose-only output.
  */
-async function summarize(ctx, config, overall, domains) {
+async function summarize(ctx, config, overall, domains, fresh, freshDomains) {
   const compact = {
     overall: overall.map(item => ({
       name: item.fullName,
@@ -291,6 +325,8 @@ async function summarize(ctx, config, overall, domains) {
       language: item.language,
     })),
     domains: Object.fromEntries(domains.map(group => [group.key, group.items.map(item => item.fullName)])),
+    new_projects: fresh.map(item => ({ name: item.fullName, stars: item.stars, age_days: item.ageDays })),
+    new_projects_by_domain: Object.fromEntries(freshDomains.map(group => [group.key, group.items.length])),
   }
   const prompt = [
     'You are writing the daily GitHub trending briefing for developers.',
@@ -298,9 +334,11 @@ async function summarize(ctx, config, overall, domains) {
     JSON.stringify(compact),
     '',
     'Write it in Chinese. Return JSON only, no markdown fence, with this shape:',
-    '{"overall":"...","domains":{"<domain key>":"..."}}',
+    '{"overall":"...","domains":{"<domain key>":"..."},"fresh":"..."}',
     'Rules: overall at most 140 characters and names the most interesting 2-3 projects; each domain at most 90',
-    'characters and states what actually moved today; skip a domain whose list is empty; no hype, no emoji.',
+    'characters and states what actually moved today; skip a domain whose list is empty;',
+    'fresh at most 110 characters and describes the newly created projects that are already attracting attention;',
+    'no hype, no emoji, no markdown.',
   ].join('\n')
 
   const controller = new AbortController()
@@ -332,6 +370,7 @@ async function summarize(ctx, config, overall, domains) {
     return {
       overall: typeof parsed.overall === 'string' ? parsed.overall.trim() : '',
       domains: parsed.domains !== null && typeof parsed.domains === 'object' ? parsed.domains : {},
+      fresh: typeof parsed.fresh === 'string' ? parsed.fresh.trim() : '',
     }
   } catch {
     return null
@@ -360,6 +399,13 @@ async function build(ctx, config) {
     }
   }
 
+  let fresh = []
+  try {
+    fresh = await fetchFresh(5)
+  } catch (freshError) {
+    warning = `${warning === null ? '' : warning + '; '}new projects failed: ${freshError instanceof Error ? freshError.message : String(freshError)}`
+  }
+
   const overall = [...items].sort((left, right) => right.starsToday - left.starsToday)
   const domains = DOMAINS
     .map(domain => ({
@@ -369,9 +415,18 @@ async function build(ctx, config) {
     }))
     .filter(group => group.items.length > 0)
 
+  const freshOverall = [...fresh].sort((left, right) => right.stars - left.stars).slice(0, config.topOverall)
+  const freshDomains = DOMAINS
+    .map(domain => ({
+      key: domain.key,
+      title: { zh: domain.zh, en: domain.en },
+      items: freshOverall.filter(item => item.domain === domain.key).slice(0, config.perDomain),
+    }))
+    .filter(group => group.items.length > 0)
+
   let summary = null
   try {
-    summary = await summarize(ctx, config, overall.slice(0, config.topOverall), domains)
+    summary = await summarize(ctx, config, overall.slice(0, config.topOverall), domains, freshOverall, freshDomains)
   } catch (error) {
     warning = `${warning === null ? '' : warning + '; '}summary failed: ${error instanceof Error ? error.message : String(error)}`
   }
@@ -384,11 +439,15 @@ async function build(ctx, config) {
     model: `${config.provider}/${config.model}`,
     overall: overall.slice(0, config.topOverall),
     domains,
+    fresh: freshOverall,
+    freshDomains,
     summary,
     stats: {
       repositories: items.length,
       starsToday: items.reduce((total, item) => total + item.starsToday, 0),
       languages: [...new Set(items.map(item => item.language).filter(Boolean))].length,
+      freshRepositories: fresh.length,
+      freshStars: fresh.reduce((total, item) => total + item.stars, 0),
     },
   }
 }
@@ -462,6 +521,13 @@ export function apply(ctx, config) {
       for (const item of overall.slice(0, 12)) {
         lines.push(`- ${item.fullName} (+${item.starsToday}★, ${item.stars}★ total, ${item.language ?? 'n/a'}) — `
           + `${item.description.slice(0, 110)}`)
+      }
+      if (wanted === null && payload.fresh.length > 0) {
+        lines.push('', '## 近 5 天新开项目')
+        if (typeof payload.summary?.fresh === 'string') lines.push(payload.summary.fresh)
+        for (const item of payload.fresh.slice(0, 10)) {
+          lines.push(`- ${item.fullName} (${item.stars}★, ${item.ageDays ?? '?'} 天前) — ${item.description.slice(0, 90)}`)
+        }
       }
       for (const group of groups) {
         lines.push('', `## ${group.title.zh} (${group.key})`)

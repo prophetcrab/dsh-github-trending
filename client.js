@@ -1,9 +1,10 @@
 /**
  * GitHub trending briefing, browser half.
  *
- * A dashboard rather than a list: hero numbers, the model's read, a bar chart
- * of today's star gain, a donut of the domain split, a detailed leaderboard,
- * and per-domain cards. Everything is drawn with plain SVG and theme tokens.
+ * The plugin's home is a dashboard: KPI tiles, two charts, today's hotspots,
+ * the model's Chinese read, the five-day new-project board, and a domain picker
+ * that filters both boards. Styling lives in one injected stylesheet so hover,
+ * transitions, and breakpoints work.
  */
 window.__ModuleLoader__.load({
   id: 'dsh-github-trending',
@@ -23,18 +24,28 @@ window.__ModuleLoader__.load({
       loading: 'Fetching github.com/trending…',
       error: 'Could not load the briefing',
       retry: 'Retry',
-      leaderboard: 'Star gain today',
-      domains: 'Split by domain',
-      detail: 'Full leaderboard',
+      kpiRepos: 'repos trending',
+      kpiStars: 'stars gained',
+      kpiFresh: 'new projects (5d)',
+      kpiLangs: 'languages',
+      chartStars: 'Star gain today',
+      chartDomains: 'Split by domain',
+      today: 'Today’s hotspots',
+      summary: 'Summary',
       editors: "Editor's read",
-      repositories: 'repos',
+      freshTitle: 'New projects (last 5 days)',
+      freshSummary: 'What just launched',
+      byDomain: 'Browse by domain',
+      all: 'All',
+      domainHot: 'Hotspots in',
+      domainFresh: 'New projects in',
+      daysAgo: 'd ago',
       starsToday: 'stars today',
-      languages: 'languages',
-      totalStars: 'total',
+      repositories: 'repos',
       updated: 'Updated',
       source: 'Source',
       fallback: 'search fallback',
-      noData: 'No repositories today.',
+      noData: 'Nothing here today.',
     }
 
     const zh = {
@@ -46,18 +57,28 @@ window.__ModuleLoader__.load({
       loading: '正在抓取 github.com/trending…',
       error: '简报加载失败',
       retry: '重试',
-      leaderboard: '今日新增 star 榜',
-      domains: '领域分布',
-      detail: '总榜明细',
+      kpiRepos: '个仓库上榜',
+      kpiStars: '今日新增 star',
+      kpiFresh: '个新开项目（5 天）',
+      kpiLangs: '种语言',
+      chartStars: '今日新增 star 榜',
+      chartDomains: '领域分布',
+      today: '今日热点项目',
+      summary: '中文总结',
       editors: '编辑导读',
+      freshTitle: '近期新开热点项目',
+      freshSummary: '新项目观察',
+      byDomain: '按领域浏览',
+      all: '全部',
+      domainHot: '领域热点',
+      domainFresh: '领域新开',
+      daysAgo: '天前',
+      starsToday: '今日新增',
       repositories: '个仓库',
-      starsToday: '今日新增 star',
-      languages: '种语言',
-      totalStars: '总 star',
       updated: '更新于',
       source: '来源',
       fallback: '搜索兜底',
-      noData: '今天没有数据。',
+      noData: '今天这个领域没有数据。',
     }
 
     /** Fixed accent per domain: artwork color, never used for text. */
@@ -73,102 +94,112 @@ window.__ModuleLoader__.load({
       other: '#9aa4ae',
     }
 
-    const COLOR = {
-      primary: 'var(--dsw-alias-label-primary)',
-      secondary: 'var(--dsw-alias-label-secondary)',
-      tertiary: 'var(--dsw-alias-label-tertiary)',
-      border: 'var(--dsw-alias-border-l1)',
-      surface: 'var(--dsw-alias-bg-layer-1)',
-      surfaceAlt: 'var(--dsw-alias-bg-layer-2)',
-      link: 'var(--dsw-alias-link)',
-      brand: 'var(--dsw-alias-brand-primary)',
-      error: 'var(--dsw-alias-state-error-primary)',
-    }
+    const CSS = `
+.ght-page { box-sizing: border-box; max-width: 1120px; margin: 0 auto; padding: 26px 30px 56px; display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
+.ght-page *, .ght-page *::before, .ght-page *::after { box-sizing: border-box; }
 
-    const S = {
-      page: {
-        padding: '28px 32px 56px', display: 'flex', flexDirection: 'column', gap: '16px',
-        maxWidth: '1080px', margin: '0 auto', minHeight: '100%', boxSizing: 'border-box',
-      },
-      hero: {
-        position: 'relative', overflow: 'hidden', borderRadius: '18px', padding: '26px 28px',
-        border: `0.5px solid ${COLOR.border}`,
-        background: `radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, ${COLOR.brand} 16%, transparent) 0%, transparent 62%), ${COLOR.surface}`,
-        display: 'flex', flexDirection: 'column', gap: '16px',
-      },
-      heroTop: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '18px' },
-      eyebrow: {
-        display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: COLOR.secondary, fontWeight: 500,
-      },
-      dot: { width: '6px', height: '6px', borderRadius: '999px', background: COLOR.brand },
-      title: { margin: '6px 0 0', fontSize: '26px', lineHeight: 1.2, fontWeight: 500, color: COLOR.primary, letterSpacing: '-0.01em' },
-      subtitle: { margin: '8px 0 0', fontSize: '12.5px', lineHeight: 1.55, color: COLOR.tertiary, maxWidth: '60ch' },
-      button: {
-        appearance: 'none', border: `0.5px solid ${COLOR.border}`, background: COLOR.surface,
-        color: COLOR.primary, fontSize: '12px', lineHeight: 1.2, padding: '7px 13px',
-        borderRadius: '9px', cursor: 'pointer', whiteSpace: 'nowrap', flex: 'none',
-      },
-      stats: { display: 'flex', flexWrap: 'wrap', gap: '10px' },
-      stat: {
-        display: 'flex', alignItems: 'baseline', gap: '7px', padding: '8px 14px',
-        borderRadius: '11px', background: 'color-mix(in srgb, var(--dsw-alias-bg-layer-1) 70%, transparent)',
-        border: `0.5px solid ${COLOR.border}`,
-      },
-      statValue: { fontSize: '18px', fontWeight: 500, color: COLOR.primary, fontVariantNumeric: 'tabular-nums' },
-      statLabel: { fontSize: '11.5px', color: COLOR.tertiary },
-      summaryCard: {
-        border: `0.5px solid ${COLOR.border}`, borderRadius: '16px', padding: '18px 22px 18px 20px',
-        background: `linear-gradient(90deg, color-mix(in srgb, ${COLOR.brand} 9%, transparent), transparent 70%), ${COLOR.surface}`,
-        borderLeft: `3px solid ${COLOR.brand}`, display: 'flex', flexDirection: 'column', gap: '8px',
-      },
-      summaryLabel: { fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', color: COLOR.secondary, fontWeight: 500 },
-      summaryText: { margin: 0, fontSize: '14px', lineHeight: 1.75, color: COLOR.primary },
-      panels: { display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'stretch' },
-      panel: {
-        border: `0.5px solid ${COLOR.border}`, borderRadius: '16px', background: COLOR.surface,
-        padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0,
-      },
-      panelHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px' },
-      panelTitle: { margin: 0, fontSize: '13px', fontWeight: 500, color: COLOR.primary },
-      panelHint: { fontSize: '11.5px', color: COLOR.tertiary },
-      legend: { display: 'flex', flexDirection: 'column', gap: '7px', minWidth: 0 },
-      legendRow: { display: 'grid', gridTemplateColumns: '9px minmax(0, 1fr) auto', alignItems: 'center', gap: '8px', minWidth: 0 },
-      legendDot: (color) => ({ width: '9px', height: '9px', borderRadius: '3px', background: color }),
-      legendName: { fontSize: '11.5px', color: COLOR.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-      legendValue: { fontSize: '11px', color: COLOR.tertiary, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
-      row: {
-        display: 'grid', gridTemplateColumns: '26px minmax(0, 1fr) 96px', gap: '12px', alignItems: 'center',
-        padding: '10px 0', borderTop: `0.5px solid ${COLOR.border}`,
-      },
-      rank: { fontSize: '11.5px', fontVariantNumeric: 'tabular-nums', textAlign: 'center', color: COLOR.tertiary },
-      rankTop: { fontSize: '11.5px', fontVariantNumeric: 'tabular-nums', textAlign: 'center', color: COLOR.brand, fontWeight: 500 },
-      repoName: { fontSize: '12.5px', fontWeight: 500, color: COLOR.link, textDecoration: 'none' },
-      repoDesc: {
-        marginTop: '2px', fontSize: '11.5px', lineHeight: 1.45, color: COLOR.tertiary,
-        display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-      },
-      num: { textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '2px' },
-      numMain: { fontSize: '12.5px', fontWeight: 500, color: COLOR.primary, fontVariantNumeric: 'tabular-nums' },
-      numSub: { fontSize: '10.5px', color: COLOR.tertiary },
-      grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' },
-      domain: { border: `0.5px solid ${COLOR.border}`, borderRadius: '14px', background: COLOR.surface, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '9px' },
-      domainHead: { display: 'flex', alignItems: 'center', gap: '8px' },
-      domainDot: (color) => ({ width: '7px', height: '7px', borderRadius: '999px', background: color, flex: 'none' }),
-      domainName: { fontSize: '12.5px', fontWeight: 500, color: COLOR.primary, flex: 1 },
-      chip: { fontSize: '10.5px', lineHeight: 1.4, color: COLOR.tertiary, border: `0.5px solid ${COLOR.border}`, borderRadius: '999px', padding: '1px 8px', flex: 'none' },
-      domainText: { margin: 0, fontSize: '12px', lineHeight: 1.65, color: COLOR.secondary },
-      item: { display: 'flex', alignItems: 'baseline', gap: '7px', minWidth: 0 },
-      itemName: { fontSize: '11.5px', color: COLOR.link, textDecoration: 'none', flex: 'none' },
-      itemDesc: { fontSize: '11px', color: COLOR.tertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 },
-      itemPlus: { fontSize: '10.5px', color: COLOR.secondary, flex: 'none', fontVariantNumeric: 'tabular-nums' },
-      notice: { border: `0.5px solid ${COLOR.border}`, borderRadius: '14px', padding: '16px 18px', fontSize: '12.5px', color: COLOR.secondary },
-      errorText: { color: COLOR.error, margin: '0 0 8px' },
-      linkButton: { appearance: 'none', border: 'none', background: 'none', padding: 0, color: COLOR.link, fontSize: '12px', cursor: 'pointer' },
-      foot: { display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '11px', color: COLOR.tertiary },
-      warn: { fontSize: '11.5px', color: COLOR.secondary },
-      svg: { display: 'block', width: '100%', height: 'auto', overflow: 'visible' },
-    }
+.ght-hero { position: relative; overflow: hidden; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 20px;
+  padding: 26px 28px; display: flex; flex-direction: column; gap: 18px;
+  background: radial-gradient(130% 150% at 100% 0%, color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent), transparent 60%),
+              radial-gradient(90% 120% at 0% 100%, color-mix(in srgb, #7c5cff 10%, transparent), transparent 65%),
+              var(--dsw-alias-bg-layer-1); }
+.ght-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.ght-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--dsw-alias-label-secondary); font-weight: 500; }
+.ght-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-brand-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent); }
+.ght-title { margin: 8px 0 0; font-size: 27px; line-height: 1.15; font-weight: 500; letter-spacing: -0.015em;
+  color: var(--dsw-alias-label-primary); }
+.ght-date { color: var(--dsw-alias-label-tertiary); font-weight: 400; }
+.ght-sub { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--dsw-alias-label-tertiary); max-width: 62ch; }
+
+.ght-btn { appearance: none; border: 0.5px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; padding: 7px 14px; border-radius: 10px;
+  cursor: pointer; white-space: nowrap; transition: border-color .15s ease, transform .15s ease; }
+.ght-btn:hover:not(:disabled) { border-color: var(--dsw-alias-brand-primary); transform: translateY(-1px); }
+.ght-btn:disabled { opacity: .55; cursor: default; }
+
+.ght-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.ght-kpi { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 14px; padding: 14px 16px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 82%, transparent);
+  display: flex; flex-direction: column; gap: 4px; }
+.ght-kpi-value { font-size: 24px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em;
+  color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; }
+.ght-kpi-label { font-size: 11px; color: var(--dsw-alias-label-tertiary); }
+.ght-kpi-accent .ght-kpi-value { color: var(--dsw-alias-brand-primary); }
+
+.ght-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
+.ght-panel { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 18px; background: var(--dsw-alias-bg-layer-1);
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; flex: 1 1 420px; }
+.ght-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ght-panel-title { margin: 0; font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary); }
+.ght-hint { font-size: 11.5px; color: var(--dsw-alias-label-tertiary); }
+
+.ght-read { border: 0.5px solid var(--dsw-alias-border-l1); border-left: 3px solid var(--dsw-alias-brand-primary);
+  border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 9%, transparent), transparent 72%),
+              var(--dsw-alias-bg-layer-1); }
+.ght-read-label { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--dsw-alias-label-secondary); font-weight: 500; }
+.ght-read-text { margin: 0; font-size: 14px; line-height: 1.8; color: var(--dsw-alias-label-primary); }
+
+.ght-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.ght-card { position: relative; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 14px;
+  background: var(--dsw-alias-bg-layer-1); padding: 14px 15px; display: flex; flex-direction: column; gap: 7px;
+  min-width: 0; transition: transform .15s ease, border-color .15s ease, background .15s ease; }
+.ght-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, var(--dsw-alias-border-l1));
+  background: var(--dsw-alias-bg-layer-2); }
+.ght-card-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ght-rank { flex: none; width: 20px; height: 20px; border-radius: 7px; display: grid; place-items: center;
+  font-size: 10.5px; color: var(--dsw-alias-label-tertiary); background: var(--dsw-alias-bg-layer-2);
+  font-variant-numeric: tabular-nums; }
+.ght-rank.top { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);
+  color: var(--dsw-alias-brand-primary); font-weight: 500; }
+.ght-name { font-size: 12.5px; font-weight: 500; color: var(--dsw-alias-label-primary); text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ght-name:hover { color: var(--dsw-alias-brand-primary); }
+.ght-desc { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--dsw-alias-label-tertiary);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 34px; }
+.ght-meta { display: flex; align-items: center; gap: 8px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary); }
+.ght-pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px;
+  border: 0.5px solid var(--dsw-alias-border-l1); }
+.ght-pill-hot { border-color: transparent; background: color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent);
+  color: var(--dsw-alias-brand-primary); font-variant-numeric: tabular-nums; }
+.ght-lang-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-label-tertiary); }
+.ght-age { margin-left: auto; color: var(--dsw-alias-label-secondary); }
+
+.ght-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.ght-chip { appearance: none; border: 0.5px solid var(--dsw-alias-border-l1); background: transparent;
+  color: var(--dsw-alias-label-secondary); font: inherit; font-size: 11.5px; padding: 5px 11px; border-radius: 999px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: color .15s ease, border-color .15s ease, background .15s ease; }
+.ght-chip:hover { color: var(--dsw-alias-label-primary); border-color: var(--dsw-alias-label-tertiary); }
+.ght-chip.active { color: var(--dsw-alias-label-primary); border-color: transparent;
+  background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-layer-2)); box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l2); }
+.ght-chip-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+.ght-domains { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ght-domain { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 14px; background: var(--dsw-alias-bg-layer-1);
+  padding: 15px 17px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.ght-domain-head { display: flex; align-items: center; gap: 8px; }
+.ght-domain-name { font-size: 12.5px; font-weight: 500; color: var(--dsw-alias-label-primary); flex: 1; }
+.ght-domain-text { margin: 0; font-size: 11.5px; line-height: 1.6; color: var(--dsw-alias-label-secondary); }
+.ght-li { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: 11px; }
+.ght-li a { color: var(--dsw-alias-label-primary); text-decoration: none; flex: none; }
+.ght-li a:hover { color: var(--dsw-alias-brand-primary); }
+.ght-li span { color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.ght-li b { color: var(--dsw-alias-label-secondary); font-weight: 400; flex: none; font-variant-numeric: tabular-nums; }
+
+.ght-empty { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 14px; padding: 18px;
+  font-size: 12.5px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-1); }
+.ght-error { color: var(--dsw-alias-state-error-primary); margin: 0 0 8px; font-size: 12.5px; }
+.ght-link-btn { appearance: none; border: none; background: none; padding: 0; color: var(--dsw-alias-brand-primary);
+  font: inherit; font-size: 12px; cursor: pointer; }
+.ght-foot { display: flex; flex-wrap: wrap; gap: 16px; font-size: 11px; color: var(--dsw-alias-label-tertiary); padding-top: 2px; }
+.ght-warn { font-size: 11.5px; color: var(--dsw-alias-label-secondary); }
+
+@media (max-width: 900px) { .ght-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ght-domains { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 620px) { .ght-page { padding: 18px 16px 40px; } .ght-kpis { grid-template-columns: minmax(0, 1fr); } .ght-title { font-size: 22px; } }
+`
 
     function TrendingIcon(props) {
       const size = props && props.size ? props.size : 18
@@ -177,106 +208,97 @@ window.__ModuleLoader__.load({
         h('path', { d: 'M9.6 4.5h3.9v3.9', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round' }))
     }
 
-    /**
-     * Horizontal bar chart of the day's star gain, drawn as SVG.
-     * @param props - items, max value, label formatter.
-     * @returns the chart.
-     */
-    function BarChart(props) {
+    function Sparkline(props) {
       const items = props.items
-      const rowHeight = 26
-      const labelWidth = 148
-      const valueWidth = 58
       const width = 560
-      const bodyWidth = width - labelWidth - valueWidth
-      const height = items.length * rowHeight
+      const labelWidth = 142
+      const valueWidth = 62
+      const body = width - labelWidth - valueWidth
+      const rowHeight = 26
       const max = Math.max(1, props.max)
-
       const rows = []
       items.forEach((item, index) => {
         const y = index * rowHeight
-        const barWidth = Math.max(3, (item.starsToday / max) * bodyWidth)
-        const name = item.fullName.length > 24 ? item.fullName.slice(0, 23) + '…' : item.fullName
+        const w = Math.max(3, (item.starsToday / max) * body)
         rows.push(
-          h('text', {
-            key: `n${item.fullName}`, x: 0, y: y + 17, fontSize: 11.5,
-            fill: index < 3 ? COLOR.primary : COLOR.secondary,
-          }, name),
-          h('rect', {
-            key: `t${item.fullName}`, x: labelWidth, y: y + 6, width: bodyWidth, height: 14, rx: 4,
-            fill: COLOR.surfaceAlt,
-          }),
-          h('rect', {
-            key: `b${item.fullName}`, x: labelWidth, y: y + 6, width: barWidth, height: 14, rx: 4,
-            fill: COLOR.brand, opacity: 0.9,
-          }),
-          h('text', {
-            key: `v${item.fullName}`, x: width, y: y + 17, fontSize: 11, textAnchor: 'end',
-            fill: COLOR.primary, fontVariantNumeric: 'tabular-nums',
-          }, `+${item.starsToday.toLocaleString()}`),
+          h('text', { key: `n${item.fullName}`, x: 0, y: y + 17, fontSize: 11.5,
+            fill: index < 3 ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-secondary)' },
+            item.fullName.length > 23 ? item.fullName.slice(0, 22) + '…' : item.fullName),
+          h('rect', { key: `t${item.fullName}`, x: labelWidth, y: y + 6, width: body, height: 14, rx: 4,
+            fill: 'var(--dsw-alias-bg-layer-2)' }),
+          h('rect', { key: `b${item.fullName}`, x: labelWidth, y: y + 6, width: w, height: 14, rx: 4,
+            fill: 'var(--dsw-alias-brand-primary)', opacity: 0.9 }),
+          h('text', { key: `v${item.fullName}`, x: width, y: y + 17, fontSize: 11, textAnchor: 'end',
+            fill: 'var(--dsw-alias-label-primary)' }, `+${item.starsToday.toLocaleString()}`),
         )
       })
-
-      return h('svg', { viewBox: `0 0 ${width} ${Math.max(height, 1)}`, style: S.svg, role: 'img', 'aria-label': props.label },
-        ...rows,
-      )
+      return h('svg', { viewBox: `0 0 ${width} ${Math.max(items.length * rowHeight, 1)}`, style: { display: 'block', width: '100%', height: 'auto' }, role: 'img', 'aria-label': props.label }, ...rows)
     }
 
-    /**
-     * Donut of the domain split with a legend beside it.
-     * @param props - groups with value and color.
-     * @returns the donut plus legend.
-     */
-    function DomainDonut(props) {
+    function Donut(props) {
       const groups = props.groups
-      const total = groups.reduce((sum, group) => sum + group.value, 0) || 1
-      const radius = 54
-      const circumference = 2 * Math.PI * radius
+      const total = groups.reduce((sum, g) => sum + g.value, 0) || 1
+      const radius = 52
+      const c = 2 * Math.PI * radius
       let offset = 0
       const arcs = groups.map((group) => {
         const fraction = group.value / total
-        const dash = Math.max(0, fraction * circumference - 1.5)
+        const dash = Math.max(0, fraction * c - 2)
         const arc = h('circle', {
-          key: group.key,
-          cx: 64, cy: 64, r: radius, fill: 'none',
-          stroke: group.color, strokeWidth: 18,
-          strokeDasharray: `${dash} ${circumference - dash}`,
-          strokeDashoffset: -offset,
-          transform: 'rotate(-90 64 64)',
-          strokeLinecap: 'butt',
+          key: group.key, cx: 62, cy: 62, r: radius, fill: 'none', stroke: group.color, strokeWidth: 17,
+          strokeDasharray: `${dash} ${c - dash}`, strokeDashoffset: -offset, transform: 'rotate(-90 62 62)',
         })
-        offset += fraction * circumference
+        offset += fraction * c
         return arc
       })
-
-      return h('div', { style: { display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' } },
-        h('svg', { viewBox: '0 0 128 128', style: { width: '132px', height: '132px', flex: 'none' }, role: 'img', 'aria-label': props.label },
-          h('circle', { cx: 64, cy: 64, r: radius, fill: 'none', stroke: COLOR.surfaceAlt, strokeWidth: 18 }),
+      return h('div', { style: { display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' } },
+        h('svg', { viewBox: '0 0 124 124', style: { width: 128, height: 128, flex: 'none' }, role: 'img', 'aria-label': props.label },
+          h('circle', { cx: 62, cy: 62, r: radius, fill: 'none', stroke: 'var(--dsw-alias-bg-layer-2)', strokeWidth: 17 }),
           ...arcs,
-          h('text', { x: 64, y: 60, textAnchor: 'middle', fontSize: 20, fill: COLOR.primary, fontWeight: 500 }, String(total)),
-          h('text', { x: 64, y: 78, textAnchor: 'middle', fontSize: 10, fill: COLOR.tertiary }, props.caption),
+          h('text', { x: 62, y: 58, textAnchor: 'middle', fontSize: 19, fontWeight: 500, fill: 'var(--dsw-alias-label-primary)' }, String(total)),
+          h('text', { x: 62, y: 76, textAnchor: 'middle', fontSize: 9.5, fill: 'var(--dsw-alias-label-tertiary)' }, props.caption),
         ),
-        h('div', { style: { ...S.legend, flex: 1 } },
-          ...groups.map(group => h('div', { key: group.key, style: S.legendRow },
-            h('i', { style: S.legendDot(group.color) }),
-            h('span', { style: S.legendName }, group.label),
-            h('span', { style: S.legendValue }, `${Math.round((group.value / total) * 100)}% · ${group.value.toLocaleString()}`),
+        h('div', { style: { display: 'flex', flexDirection: 'column', gap: 7, flex: 1, minWidth: 140 } },
+          ...groups.map(group => h('div', { key: group.key, style: { display: 'grid', gridTemplateColumns: '9px minmax(0,1fr) auto', gap: 8, alignItems: 'center' } },
+            h('i', { style: { width: 9, height: 9, borderRadius: 3, background: group.color, display: 'inline-block' } }),
+            h('span', { style: { fontSize: 11.5, color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, group.label),
+            h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' } },
+              `${Math.round((group.value / total) * 100)}%`),
           )),
         ),
       )
     }
 
-    function RepoRow(props) {
+    function RepoCard(props) {
       const item = props.item
-      return h('div', { style: S.row },
-        h('span', { style: props.index < 3 ? S.rankTop : S.rank }, props.index + 1),
-        h('div', { style: { minWidth: 0 } },
-          h('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer', style: S.repoName }, item.fullName),
-          h('div', { style: S.repoDesc, title: item.description }, item.description || '—'),
+      return h('article', { className: 'ght-card' },
+        h('div', { className: 'ght-card-top' },
+          h('span', { className: `ght-rank${props.index < 3 ? ' top' : ''}` }, String(props.index + 1)),
+          h('a', { className: 'ght-name', href: item.url, target: '_blank', rel: 'noopener noreferrer', title: item.fullName }, item.fullName),
         ),
-        h('div', { style: S.num },
-          h('span', { style: S.numMain }, `+${item.starsToday.toLocaleString()}`),
-          h('span', { style: S.numSub }, `${item.language ?? '—'} · ${item.stars.toLocaleString()}`),
+        h('p', { className: 'ght-desc', title: item.description }, item.description || '—'),
+        h('div', { className: 'ght-meta' },
+          item.language && h('span', { className: 'ght-lang-dot' }),
+          h('span', null, item.language ?? '—'),
+          h('span', { className: 'ght-pill ght-pill-hot' }, `+${item.starsToday.toLocaleString()}`),
+          h('span', { className: 'ght-pill' }, `${item.stars.toLocaleString()} ★`),
+        ),
+      )
+    }
+
+    function FreshCard(props) {
+      const item = props.item
+      return h('article', { className: 'ght-card' },
+        h('div', { className: 'ght-card-top' },
+          h('a', { className: 'ght-name', href: item.url, target: '_blank', rel: 'noopener noreferrer', title: item.fullName }, item.fullName),
+        ),
+        h('p', { className: 'ght-desc', title: item.description }, item.description || '—'),
+        h('div', { className: 'ght-meta' },
+          item.language && h('span', { className: 'ght-lang-dot' }),
+          h('span', null, item.language ?? '—'),
+          h('span', { className: 'ght-pill ght-pill-hot' }, `${item.stars.toLocaleString()} ★`),
+          item.ageDays !== null && item.ageDays !== undefined
+            && h('span', { className: 'ght-age' }, `${item.ageDays} ${props.daysAgo}`),
         ),
       )
     }
@@ -284,6 +306,7 @@ window.__ModuleLoader__.load({
     function Brief(props) {
       const t = typeof props.t === 'function' ? props.t : (key) => key
       const [state, setState] = React.useState({ status: 'loading', data: null, error: null })
+      const [domain, setDomain] = React.useState('all')
       const ticket = React.useRef(0)
 
       const load = React.useCallback((force) => {
@@ -311,7 +334,20 @@ window.__ModuleLoader__.load({
 
       const data = state.data
       const busy = state.status === 'loading' || state.status === 'refreshing'
-      const top = data === null ? [] : data.overall.slice(0, 10)
+      const fresh = data !== null && Array.isArray(data.fresh) ? data.fresh : []
+      const freshDomains = data !== null && Array.isArray(data.freshDomains) ? data.freshDomains : []
+      const domainKeys = data === null ? [] : [...new Set([...data.domains, ...freshDomains].map(group => group.key))]
+      const domainTitle = (key) => {
+        if (data === null) return key
+        const group = [...data.domains, ...freshDomains].find(entry => entry.key === key)
+        return group === undefined ? key : group.title.zh
+      }
+      const hotItems = data === null ? [] : (domain === 'all'
+        ? data.overall
+        : (data.domains.find(group => group.key === domain)?.items ?? []))
+      const freshItems = data === null ? [] : (domain === 'all'
+        ? fresh
+        : (freshDomains.find(group => group.key === domain)?.items ?? []))
       const donutGroups = data === null ? [] : data.domains.map(group => ({
         key: group.key,
         label: group.title.zh,
@@ -319,89 +355,125 @@ window.__ModuleLoader__.load({
         value: group.items.reduce((sum, item) => sum + item.starsToday, 0),
       })).filter(group => group.value > 0)
 
-      return h('div', { style: S.page },
-        h('section', { style: S.hero },
-          h('div', { style: S.heroTop },
+      return h('div', { className: 'ght-page' },
+        h('header', { className: 'ght-hero' },
+          h('div', { className: 'ght-hero-top' },
             h('div', null,
-              h('span', { style: S.eyebrow }, h('i', { style: S.dot }), t('eyebrow')),
-              h('h1', { style: S.title }, `${t('title')}${data === null ? '' : ' · ' + data.day}`),
-              h('p', { style: S.subtitle }, t('subtitle')),
+              h('span', { className: 'ght-eyebrow' }, h('i', { className: 'ght-dot' }), t('eyebrow')),
+              h('h1', { className: 'ght-title' }, t('title'), data === null ? null : h('span', { className: 'ght-date' }, ` · ${data.day}`)),
+              h('p', { className: 'ght-sub' }, t('subtitle')),
             ),
-            h('button', { type: 'button', style: S.button, disabled: busy, onClick: () => { load(true) } }, t(busy ? 'refreshing' : 'refresh')),
+            h('button', { type: 'button', className: 'ght-btn', disabled: busy, onClick: () => { load(true) } }, t(busy ? 'refreshing' : 'refresh')),
           ),
-          data !== null && h('div', { style: S.stats },
-            h('span', { style: S.stat }, h('b', { style: S.statValue }, String(data.stats.repositories)), h('span', { style: S.statLabel }, t('repositories'))),
-            h('span', { style: S.stat }, h('b', { style: S.statValue }, data.stats.starsToday.toLocaleString()), h('span', { style: S.statLabel }, t('starsToday'))),
-            h('span', { style: S.stat }, h('b', { style: S.statValue }, String(data.stats.languages)), h('span', { style: S.statLabel }, t('languages'))),
+          data !== null && h('div', { className: 'ght-kpis' },
+            h('div', { className: 'ght-kpi' }, h('span', { className: 'ght-kpi-value' }, String(data.stats.repositories)), h('span', { className: 'ght-kpi-label' }, t('kpiRepos'))),
+            h('div', { className: 'ght-kpi ght-kpi-accent' }, h('span', { className: 'ght-kpi-value' }, data.stats.starsToday.toLocaleString()), h('span', { className: 'ght-kpi-label' }, t('kpiStars'))),
+            h('div', { className: 'ght-kpi' }, h('span', { className: 'ght-kpi-value' }, String(data.stats.freshRepositories ?? fresh.length)), h('span', { className: 'ght-kpi-label' }, t('kpiFresh'))),
+            h('div', { className: 'ght-kpi' }, h('span', { className: 'ght-kpi-value' }, String(data.stats.languages)), h('span', { className: 'ght-kpi-label' }, t('kpiLangs'))),
           ),
         ),
 
-        state.status === 'loading' && h('div', { style: S.notice, role: 'status' }, t('loading')),
-
-        state.status === 'error' && h('div', { style: S.notice, role: 'alert' },
-          h('p', { style: S.errorText }, `${t('error')}: ${state.error}`),
-          h('button', { type: 'button', style: S.linkButton, onClick: () => { load(true) } }, t('retry')),
+        state.status === 'loading' && h('div', { className: 'ght-empty', role: 'status' }, t('loading')),
+        state.status === 'error' && h('div', { className: 'ght-empty', role: 'alert' },
+          h('p', { className: 'ght-error' }, `${t('error')}: ${state.error}`),
+          h('button', { type: 'button', className: 'ght-link-btn', onClick: () => { load(true) } }, t('retry')),
         ),
 
-        data?.summary?.overall && h('section', { style: S.summaryCard },
-          h('span', { style: S.summaryLabel }, t('editors')),
-          h('p', { style: S.summaryText }, data.summary.overall),
-        ),
-
-        data !== null && h('div', { style: S.panels },
-          h('section', { style: S.panel },
-            h('div', { style: S.panelHead },
-              h('h2', { style: S.panelTitle }, t('leaderboard')),
-              h('span', { style: S.panelHint }, `Top ${top.length}`),
-            ),
-            top.length === 0
-              ? h('div', { style: S.panelHint }, t('noData'))
-              : h(BarChart, { items: top, max: top[0].starsToday, label: t('leaderboard') }),
+        data !== null && h('div', { className: 'ght-row' },
+          h('section', { className: 'ght-panel' },
+            h('div', { className: 'ght-panel-head' }, h('h2', { className: 'ght-panel-title' }, t('chartStars')), h('span', { className: 'ght-hint' }, `Top ${Math.min(10, data.overall.length)}`)),
+            h(Sparkline, { items: data.overall.slice(0, 10), max: data.overall[0].starsToday, label: t('chartStars') }),
           ),
-          h('section', { style: S.panel },
-            h('div', { style: S.panelHead },
-              h('h2', { style: S.panelTitle }, t('domains')),
-              h('span', { style: S.panelHint }, `${data.domains.length}`),
-            ),
+          h('section', { className: 'ght-panel', style: { flex: '1 1 320px' } },
+            h('div', { className: 'ght-panel-head' }, h('h2', { className: 'ght-panel-title' }, t('chartDomains')), h('span', { className: 'ght-hint' }, String(data.domains.length))),
             donutGroups.length === 0
-              ? h('div', { style: S.panelHint }, t('noData'))
-              : h(DomainDonut, { groups: donutGroups, caption: t('starsToday'), label: t('domains') }),
+              ? h('div', { className: 'ght-hint' }, t('noData'))
+              : h(Donut, { groups: donutGroups, caption: t('starsToday'), label: t('chartDomains') }),
           ),
         ),
 
-        data !== null && h('section', { style: S.panel },
-          h('div', { style: S.panelHead },
-            h('h2', { style: S.panelTitle }, t('detail')),
-            h('span', { style: S.panelHint }, `${data.overall.length} ${t('repositories')}`),
+        data !== null && h('section', { className: 'ght-panel' },
+          h('div', { className: 'ght-panel-head' },
+            h('h2', { className: 'ght-panel-title' }, t('today')),
+            h('span', { className: 'ght-hint' }, `${hotItems.length} ${t('repositories')}`),
           ),
-          ...data.overall.map((item, index) => h(RepoRow, { key: item.fullName, item, index })),
+          h('div', { className: 'ght-grid' },
+            ...(hotItems.length === 0
+              ? [h('div', { key: 'empty', className: 'ght-hint' }, t('noData'))]
+              : hotItems.map((item, index) => h(RepoCard, { key: item.fullName, item, index }))),
+          ),
         ),
 
-        data !== null && data.domains.length > 0 && h('section', { style: S.panel },
-          h('div', { style: S.panelHead },
-            h('h2', { style: S.panelTitle }, t('domains')),
-            h('span', { style: S.panelHint }, `${data.domains.length}`),
+        data !== null && (data.summary?.overall || data.summary?.fresh) && h('section', { className: 'ght-panel', style: { gap: 10 } },
+          h('div', { className: 'ght-panel-head' }, h('h2', { className: 'ght-panel-title' }, t('summary'))),
+          data.summary?.overall && h('div', { className: 'ght-read' },
+            h('span', { className: 'ght-read-label' }, t('editors')),
+            h('p', { className: 'ght-read-text' }, data.summary.overall),
           ),
-          h('div', { style: S.grid },
-            ...data.domains.map(group => h('div', { key: group.key, style: S.domain },
-              h('div', { style: S.domainHead },
-                h('i', { style: S.domainDot(DOMAIN_COLOR[group.key] ?? DOMAIN_COLOR.other) }),
-                h('span', { style: S.domainName }, group.title.zh),
-                h('span', { style: S.chip }, String(group.items.length)),
-              ),
-              typeof data.summary?.domains?.[group.key] === 'string' && h('p', { style: S.domainText }, data.summary.domains[group.key]),
-              ...group.items.map(item => h('div', { key: item.fullName, style: S.item },
-                h('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer', style: S.itemName }, item.repo),
-                h('span', { style: S.itemDesc, title: item.description }, item.description || ''),
-                h('span', { style: S.itemPlus }, `+${item.starsToday}`),
-              )),
+          data.summary?.fresh && h('div', { className: 'ght-read' },
+            h('span', { className: 'ght-read-label' }, t('freshSummary')),
+            h('p', { className: 'ght-read-text' }, data.summary.fresh),
+          ),
+        ),
+
+        data !== null && fresh.length > 0 && h('section', { className: 'ght-panel' },
+          h('div', { className: 'ght-panel-head' },
+            h('h2', { className: 'ght-panel-title' }, t('freshTitle')),
+            h('span', { className: 'ght-hint' }, `${fresh.length} ${t('repositories')}`),
+          ),
+          h('div', { className: 'ght-grid' },
+            ...fresh.slice(0, 12).map((item, index) => h(FreshCard, { key: item.fullName, item, index, daysAgo: t('daysAgo') })),
+          ),
+        ),
+
+        data !== null && domainKeys.length > 0 && h('section', { className: 'ght-panel' },
+          h('div', { className: 'ght-panel-head' }, h('h2', { className: 'ght-panel-title' }, t('byDomain'))),
+          h('div', { className: 'ght-chips' },
+            h('button', { type: 'button', className: `ght-chip${domain === 'all' ? ' active' : ''}`, onClick: () => { setDomain('all') } }, t('all')),
+            ...domainKeys.map(key => h('button', {
+              key, type: 'button', className: `ght-chip${domain === key ? ' active' : ''}`,
+              onClick: () => { setDomain(key) },
+            },
+              h('i', { className: 'ght-chip-dot', style: { background: DOMAIN_COLOR[key] ?? DOMAIN_COLOR.other } }),
+              domainTitle(key),
             )),
           ),
+          h('div', { className: 'ght-domains' },
+            h('div', { className: 'ght-domain' },
+              h('div', { className: 'ght-domain-head' },
+                h('i', { style: { width: 7, height: 7, borderRadius: 3, background: domain === 'all' ? 'var(--dsw-alias-brand-primary)' : (DOMAIN_COLOR[domain] ?? DOMAIN_COLOR.other) } }),
+                h('span', { className: 'ght-domain-name' }, domain === 'all' ? t('domainHot') : `${t('domainHot')} · ${domainTitle(domain)}`),
+                h('span', { className: 'ght-hint' }, String(hotItems.length)),
+              ),
+              typeof data.summary?.domains?.[domain] === 'string' && h('p', { className: 'ght-domain-text' }, data.summary.domains[domain]),
+              ...(hotItems.length === 0
+                ? [h('div', { key: 'e', className: 'ght-hint' }, t('noData'))]
+                : hotItems.slice(0, 8).map(item => h('div', { key: item.fullName, className: 'ght-li' },
+                    h('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer' }, item.repo),
+                    h('span', { title: item.description }, item.description || ''),
+                    h('b', null, `+${item.starsToday}`),
+                  ))),
+            ),
+            h('div', { className: 'ght-domain' },
+              h('div', { className: 'ght-domain-head' },
+                h('i', { style: { width: 7, height: 7, borderRadius: 3, background: domain === 'all' ? 'var(--dsw-alias-brand-primary)' : (DOMAIN_COLOR[domain] ?? DOMAIN_COLOR.other) } }),
+                h('span', { className: 'ght-domain-name' }, domain === 'all' ? t('domainFresh') : `${t('domainFresh')} · ${domainTitle(domain)}`),
+                h('span', { className: 'ght-hint' }, String(freshItems.length)),
+              ),
+              ...(freshItems.length === 0
+                ? [h('div', { key: 'e', className: 'ght-hint' }, t('noData'))]
+                : freshItems.slice(0, 8).map(item => h('div', { key: item.fullName, className: 'ght-li' },
+                    h('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer' }, item.repo),
+                    h('span', { title: item.description }, item.description || ''),
+                    h('b', null, `${item.stars.toLocaleString()} ★`),
+                  ))),
+            ),
+          ),
         ),
 
-        data?.warning && h('div', { style: S.warn }, `⚠ ${data.warning}`),
+        data?.warning && h('div', { className: 'ght-warn' }, `⚠ ${data.warning}`),
 
-        data !== null && h('div', { style: S.foot },
+        data !== null && h('footer', { className: 'ght-foot' },
           h('span', null, `${t('updated')} ${new Date(data.generatedAt).toLocaleTimeString()}`),
           h('span', null, `${t('source')}: ${data.source === 'search' ? t('fallback') : 'github.com/trending'}`),
           h('span', null, data.model),
@@ -413,6 +485,15 @@ window.__ModuleLoader__.load({
       inject: ['slots', 'locale'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'github-trending: copy dictionaries')
+        // One plugin-owned stylesheet: hover, transitions and breakpoints are
+        // not expressible as inline styles.
+        ctx.effect(() => {
+          const style = document.createElement('style')
+          style.dataset.plugin = 'gh-trending'
+          style.textContent = CSS
+          document.head.appendChild(style)
+          return () => { style.remove() }
+        }, 'github-trending: stylesheet')
         const t = ctx.locale.bind(NS)
         // The `main` seat passes no locale binding, so bind it here and hand the
         // bound translator down; a missing one used to crash the render.
