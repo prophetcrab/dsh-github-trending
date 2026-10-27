@@ -1,0 +1,5 @@
+# GitHub trending briefing: a sidebar entry plus a main panel showing today's
+# overall leaderboard, per-domain hotspots, and the model's summary.
+- insert:
+    - id: gh-trending
+      name: dsh-github-trending

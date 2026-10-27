@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="GitHub trending">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#0f1f2e"/>
+  <path d="M13 45 25 31l9 8 17-22" fill="none" stroke="#7ee0a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M39 17h12v12" fill="none" stroke="#7ee0a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="13" cy="45" r="3" fill="#e8fff2"/>
+  <circle cx="25" cy="31" r="3" fill="#e8fff2"/>
+  <circle cx="34" cy="39" r="3" fill="#e8fff2"/>
+</svg>
