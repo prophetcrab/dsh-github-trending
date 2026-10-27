@@ -25,6 +25,8 @@ export const inject = ['webServer', 'tools', 'llm', 'systemPrompt']
 const BRIEF_PATH = '/gh-trending/brief'
 const TRENDING_URL = 'https://github.com/trending?since=daily'
 const SEARCH_URL = 'https://api.github.com/search/repositories'
+const PAPERS_PATH = '/gh-trending/papers'
+const HF_DAILY = 'https://huggingface.co/api/daily_papers?limit=60'
 const USER_AGENT = 'dsh-github-trending/0.1 (+https://github.com/prophetcrab/dsh-github-trending)'
 
 /**
@@ -100,6 +102,59 @@ const MATCHERS = DOMAINS.map(domain => ({
     return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i')
   }),
 }))
+
+/** Paper topic buckets, ordered; the first best-scoring bucket wins. */
+const PAPER_DOMAINS = [
+  { key: 'agents', zh: 'Agent / 智能体', en: 'Agents',
+    keywords: ['agent', 'agents', 'tool use', 'tool-use', 'planning', 'multi-agent', 'skill', 'workflow'] },
+  { key: 'llm', zh: '大模型', en: 'LLMs',
+    keywords: ['language model', 'llm', 'llms', 'transformer', 'pretraining', 'pre-training', 'fine-tuning',
+      'instruction', 'alignment', 'reasoning', 'in-context', 'token'] },
+  { key: 'multimodal', zh: '多模态 / 视觉', en: 'Multimodal',
+    keywords: ['vision', 'image', 'video', 'multimodal', 'multi-modal', 'diffusion', 'vlm', '3d', 'segmentation'] },
+  { key: 'rl', zh: '强化学习', en: 'RL',
+    keywords: ['reinforcement', 'rl', 'reward', 'policy', 'bandit', 'preference optimization'] },
+  { key: 'efficiency', zh: '效率 / 系统', en: 'Efficiency',
+    keywords: ['efficient', 'inference', 'quantization', 'distillation', 'latency', 'throughput', 'kernel',
+      'serving', 'memory', 'compression', 'sparse'] },
+  { key: 'rag', zh: '检索 / RAG', en: 'Retrieval',
+    keywords: ['retrieval', 'rag', 'embedding', 'vector search', 'search', 'index'] },
+  { key: 'speech', zh: '语音', en: 'Speech',
+    keywords: ['speech', 'audio', 'tts', 'asr', 'voice', 'music'] },
+  { key: 'safety', zh: '安全 / 对齐', en: 'Safety',
+    keywords: ['safety', 'jailbreak', 'attack', 'privacy', 'robust', 'watermark', 'misuse'] },
+  { key: 'theory', zh: '理论', en: 'Theory',
+    keywords: ['theoretical', 'theorem', 'proof', 'bound', 'convergence', 'generalization'] },
+]
+
+/** Paper keyword matchers, built once with word boundaries. */
+const PAPER_MATCHERS = PAPER_DOMAINS.map(domain => ({
+  key: domain.key,
+  patterns: domain.keywords.map((keyword) => {
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i')
+  }),
+}))
+
+/**
+ * Assign one paper to a topic bucket.
+ * @param title - paper title.
+ * @param abstract - paper abstract.
+ * @param keywords - model-extracted keywords.
+ * @returns bucket key.
+ */
+function classifyPaper(title, abstract, keywords) {
+  const haystack = `${title} ${abstract} ${keywords.join(' ')}`
+  let best = { key: null, score: 0 }
+  for (const domain of PAPER_MATCHERS) {
+    let score = 0
+    for (const pattern of domain.patterns) {
+      if (pattern.test(haystack)) score += 2
+    }
+    if (score > best.score) best = { key: domain.key, score }
+  }
+  return best.key ?? 'other'
+}
 
 /** One cache entry: the payload plus when it was built. */
 let cache = { at: 0, payload: null }
@@ -486,6 +541,196 @@ function briefing(ctx, config, force) {
   return pending
 }
 
+/** Cache for the paper digest, independent of the repository briefing. */
+let papersCache = { at: 0, payload: null }
+let papersPending = null
+
+/**
+ * Normalize the Hugging Face daily-papers payload.
+ * @param payload - the parsed API response.
+ * @returns paper records.
+ */
+function parsePapers(payload) {
+  if (!Array.isArray(payload)) return []
+  return payload.map((entry) => {
+    const paper = entry?.paper ?? {}
+    const id = String(paper.id ?? '')
+    const title = String(paper.title ?? '')
+    const abstract = String(paper.summary ?? '')
+    const keywords = Array.isArray(paper.ai_keywords) ? paper.ai_keywords.slice(0, 8).map(String) : []
+    const published = Date.parse(String(paper.publishedAt ?? ''))
+    const authors = Array.isArray(paper.authors) ? paper.authors.slice(0, 5).map(author => String(author?.name ?? '')) : []
+    return {
+      id,
+      title,
+      abstract,
+      upvotes: Number(paper.upvotes ?? 0),
+      publishedAt: String(paper.publishedAt ?? ''),
+      ageDays: Number.isFinite(published) ? Math.max(0, Math.floor((Date.now() - published) / 86_400_000)) : null,
+      authors,
+      keywords,
+      url: `https://arxiv.org/abs/${id}`,
+      hfUrl: `https://huggingface.co/papers/${id}`,
+      domain: classifyPaper(title, abstract, keywords),
+    }
+  }).filter(paper => paper.id !== '' && paper.title !== '')
+}
+
+/**
+ * Read the Hugging Face daily-papers list.
+ * @returns paper records.
+ */
+async function fetchPapers() {
+  const raw = JSON.parse(await curl(HF_DAILY, 'application/json', 30_000))
+  const papers = parsePapers(raw)
+  if (papers.length === 0) throw new Error('hugging face daily papers returned no entries')
+  return papers
+}
+
+/**
+ * Ask the model for the paper digest, topic reads, and one Chinese line per paper.
+ * @param ctx - plugin context.
+ * @param config - resolved config.
+ * @param papers - the ranked papers.
+ * @param domains - grouped papers.
+ * @returns the parsed digest.
+ */
+async function summarizePapers(ctx, config, papers, domains) {
+  const compact = {
+    papers: papers.map(paper => ({
+      id: paper.id,
+      title: paper.title,
+      abstract: paper.abstract.slice(0, 700),
+      upvotes: paper.upvotes,
+      age_days: paper.ageDays,
+    })),
+    topics: Object.fromEntries(domains.map(group => [group.key, group.items.length])),
+  }
+  const prompt = [
+    'You are writing the daily AI research digest for experienced engineers.',
+    'Here is today\'s paper list as JSON:',
+    JSON.stringify(compact),
+    '',
+    'Write it in Chinese. Return JSON only, no markdown fence, with this shape:',
+    '{"digest":"...","domains":{"<topic key>":"..."},"papers":{"<paper id>":"..."}}',
+    'Rules: digest at most 160 characters and names the 2-3 most interesting directions;',
+    'each topic line at most 90 characters and says what actually moved;',
+    'papers maps EVERY id above to at most 70 characters stating the problem, the method, and the result in plain words;',
+    'keep keys exactly as given; no hype, no emoji, no markdown.',
+  ].join('\n')
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => { controller.abort() }, 120_000)
+  let text = ''
+  try {
+    for await (const chunk of ctx.llm.stream({
+      provider: config.provider,
+      model: config.model,
+      temperature: 0.3,
+      messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
+      signal: controller.signal,
+    })) {
+      if (chunk.type === 'text-delta') text += chunk.text
+      if (chunk.type === 'finish' && (chunk.reason.kind === 'error' || chunk.reason.kind === 'aborted')) {
+        throw new Error(`model ended with ${chunk.reason.kind}`)
+      }
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+  const match = /\{[\s\S]*\}/.exec(text)
+  if (match === null) return null
+  try {
+    const parsed = JSON.parse(match[0])
+    const perPaper = {}
+    if (parsed.papers !== null && typeof parsed.papers === 'object') {
+      for (const [id, value] of Object.entries(parsed.papers)) {
+        if (typeof value === 'string' && value.trim() !== '') perPaper[id] = value.trim()
+      }
+    }
+    return {
+      digest: typeof parsed.digest === 'string' ? parsed.digest.trim() : '',
+      domains: parsed.domains !== null && typeof parsed.domains === 'object' ? parsed.domains : {},
+      papers: perPaper,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Build the paper digest.
+ * @param ctx - plugin context.
+ * @param config - resolved config.
+ * @returns the payload served by the papers route.
+ */
+async function buildPapers(ctx, config) {
+  const all = await fetchPapers()
+  const scored = all.map(paper => ({
+    ...paper,
+    score: paper.upvotes + (paper.ageDays !== null && paper.ageDays <= 2 ? 30 : paper.ageDays !== null && paper.ageDays <= 7 ? 12 : 0),
+  }))
+  const ranked = [...scored].sort((left, right) => right.score - left.score)
+  const top = ranked.slice(0, 18)
+  const fresh = [...all]
+    .filter(paper => paper.ageDays !== null && paper.ageDays <= 2)
+    .sort((left, right) => right.upvotes - left.upvotes)
+    .slice(0, 12)
+  const domains = PAPER_DOMAINS
+    .map(domain => ({
+      key: domain.key,
+      title: { zh: domain.zh, en: domain.en },
+      items: ranked.filter(paper => paper.domain === domain.key).slice(0, 6),
+    }))
+    .filter(group => group.items.length > 0)
+
+  let summary = null
+  let warning = null
+  try {
+    summary = await summarizePapers(ctx, config, top, domains)
+  } catch (error) {
+    warning = `paper summary failed: ${error instanceof Error ? error.message : String(error)}`
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    day: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+    source: 'huggingface',
+    warning,
+    model: `${config.provider}/${config.model}`,
+    papers: top,
+    freshPapers: fresh,
+    domains,
+    summary,
+    stats: {
+      papers: all.length,
+      upvotes: all.reduce((total, paper) => total + paper.upvotes, 0),
+      topUpvotes: all.reduce((best, paper) => Math.max(best, paper.upvotes), 0),
+      topics: domains.length,
+    },
+  }
+}
+
+/**
+ * Serve a cached paper digest, rebuilding when stale or forced.
+ * @param ctx - plugin context.
+ * @param config - resolved config.
+ * @param force - bypass the cache.
+ * @returns the payload.
+ */
+function paperDigest(ctx, config, force) {
+  const fresh = papersCache.payload !== null && Date.now() - papersCache.at < config.cacheMinutes * 60_000
+  if (fresh && !force) return Promise.resolve(papersCache.payload)
+  if (papersPending !== null) return papersPending
+  papersPending = buildPapers(ctx, config)
+    .then((payload) => {
+      papersCache = { at: Date.now(), payload }
+      return payload
+    })
+    .finally(() => { papersPending = null })
+  return papersPending
+}
+
 /** Register the route, the tool, and the prompt guidance. */
 export function apply(ctx, config) {
   const resolved = {
@@ -501,7 +746,9 @@ export function apply(ctx, config) {
     name: 'tool:github-trending',
     order: 2360,
     text: 'GitHub trending: gh_trending_brief returns today\'s trending repositories with a model-written summary, '
-      + 'split into an overall leaderboard and per-domain hotspots. Use it when the user asks what is hot on GitHub today.',
+      + 'split into an overall leaderboard and per-domain hotspots. paper_brief returns the daily AI paper digest from '
+      + 'Hugging Face daily papers: ranked papers, topic buckets, and a Chinese one-liner per paper. Use them when the '
+      + 'user asks what is hot on GitHub or in AI research today.',
   })
 
   ctx.tools.register({
@@ -552,6 +799,47 @@ export function apply(ctx, config) {
     },
   })
 
+  ctx.tools.register({
+    name: 'paper_brief',
+    description:
+      'Read the daily AI paper digest: recent high-heat papers from Hugging Face daily papers, grouped by topic, '
+      + 'each with a Chinese one-liner. Read-only; the digest is cached for a short while.',
+    parameters: {
+      type: 'object',
+      properties: {
+        refresh: { type: 'boolean', description: 'Ignore the cache and rebuild from huggingface.co/papers.' },
+        topic: { type: 'string', description: 'Return only this topic key (agents, llm, multimodal, rl, efficiency, rag, speech, safety, theory).' },
+      },
+      additionalProperties: false,
+    },
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: String(value) }],
+    },
+    execute: async (args) => {
+      const payload = await paperDigest(ctx, resolved, args?.refresh === true)
+      const wanted = typeof args?.topic === 'string' ? args.topic : null
+      const lines = []
+      lines.push(`AI paper digest ${payload.day} (${payload.stats.papers} papers, ${payload.stats.upvotes} upvotes total)`)
+      if (payload.summary?.digest) lines.push('', payload.summary.digest)
+      if (payload.warning !== null) lines.push('', `warning: ${payload.warning}`)
+      const papers = wanted === null ? payload.papers : payload.papers.filter(paper => paper.domain === wanted)
+      lines.push('', 'Papers:')
+      for (const paper of papers.slice(0, 12)) {
+        lines.push(`- ${paper.title} (${paper.upvotes}▲, ${paper.ageDays ?? '?'}d) ${paper.url}`)
+        const zh = payload.summary?.papers?.[paper.id]
+        if (typeof zh === 'string') lines.push(`  ${zh}`)
+      }
+      if (wanted === null) {
+        for (const group of payload.domains) {
+          lines.push('', `## ${group.title.zh}`)
+          if (typeof payload.summary?.domains?.[group.key] === 'string') lines.push(payload.summary.domains[group.key])
+        }
+      }
+      return lines.join('\n')
+    },
+  })
+
   ctx.inject(['webServer'], (child) => {
     child.effect(() => child.webServer.register({
       kind: 'exact',
@@ -587,5 +875,40 @@ export function apply(ctx, config) {
         })
       },
     }), 'github-trending: brief route')
+
+    child.effect(() => child.webServer.register({
+      kind: 'exact',
+      path: PAPERS_PATH,
+      handler: (req, res) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          res.writeHead(405, { allow: 'GET, HEAD' })
+          res.end()
+          return
+        }
+        void (async () => {
+          const url = new URL(req.url ?? PAPERS_PATH, 'http://127.0.0.1')
+          const force = resolved.refreshOnDemand && url.searchParams.get('refresh') === '1'
+          const payload = await paperDigest(ctx, resolved, force)
+          const body = Buffer.from(JSON.stringify(payload), 'utf8')
+          res.writeHead(200, {
+            'content-type': 'application/json; charset=utf-8',
+            'content-length': String(body.length),
+            'cache-control': 'no-store',
+          })
+          res.end(req.method === 'HEAD' ? undefined : body)
+        })().catch((error) => {
+          const body = Buffer.from(JSON.stringify({
+            error: error instanceof Error ? error.message : String(error),
+            requestId: randomUUID(),
+          }), 'utf8')
+          if (!res.headersSent) {
+            res.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'content-length': String(body.length) })
+            res.end(body)
+          } else {
+            res.destroy()
+          }
+        })
+      },
+    }), 'github-trending: papers route')
   })
 }

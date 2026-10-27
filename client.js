@@ -47,6 +47,11 @@ window.__ModuleLoader__.load({
       fallback: 'search fallback',
       noData: 'Nothing here today.',
       summaryMissing: 'The model summary is unavailable for this snapshot; retry to rebuild it.',
+      tabGithub: 'GitHub', tabPapers: 'Papers',
+      papersTitle: 'AI papers in focus', papersSub: 'Recent high-heat papers from Hugging Face daily papers, with a Chinese read on each.',
+      kpiPapers: 'papers tracked', kpiUpvotes: 'upvotes', kpiTop: 'top paper', kpiTopics: 'topics',
+      chartUpvotes: 'Upvotes', chartTopics: 'Topics', digest: 'Daily read', mustRead: 'Papers to read',
+      freshPapers: 'Just submitted', byTopic: 'Browse by topic', upvotes: 'upvotes', abstractMissing: 'No abstract.',
     }
 
     const zh = {
@@ -81,6 +86,11 @@ window.__ModuleLoader__.load({
       fallback: '搜索兜底',
       noData: '今天这个领域没有数据。',
       summaryMissing: '这一份快照没有模型总结，点「重试」重新生成。',
+      tabGithub: 'GitHub', tabPapers: '热点论文',
+      papersTitle: 'AI 热点论文', papersSub: '来自 Hugging Face 每日论文的近期高热论文，每篇附中文解读。',
+      kpiPapers: '篇论文', kpiUpvotes: '总 upvotes', kpiTop: '最高热度', kpiTopics: '个方向',
+      chartUpvotes: 'upvotes 排行', chartTopics: '方向分布', digest: '今日综述', mustRead: '今日必读',
+      freshPapers: '刚提交的论文', byTopic: '按方向浏览', upvotes: 'upvotes', abstractMissing: '暂无摘要。',
     }
 
     /** Fixed accent per domain: artwork color, never used for text. */
@@ -93,6 +103,20 @@ window.__ModuleLoader__.load({
       security: '#d93f6d',
       systems: '#8a8f98',
       mobile: '#3fbf6f',
+      other: '#9aa4ae',
+    }
+
+    /** Fixed accent per paper topic. */
+    const TOPIC_COLOR = {
+      agents: '#7c5cff',
+      llm: '#4d6bfe',
+      multimodal: '#2f9bff',
+      rl: '#16b8a6',
+      efficiency: '#f0a020',
+      rag: '#3fbf6f',
+      speech: '#e0563d',
+      safety: '#d93f6d',
+      theory: '#8a8f98',
       other: '#9aa4ae',
     }
 
@@ -203,6 +227,18 @@ window.__ModuleLoader__.load({
 .ght-li span { color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .ght-li b { color: var(--dsw-alias-label-secondary); font-weight: 400; flex: none; font-variant-numeric: tabular-nums; }
 
+.ght-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px;
+  border: 0.5px solid var(--dsw-alias-border-l1); background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 80%, transparent); }
+.ght-tab { appearance: none; border: none; background: transparent; color: var(--dsw-alias-label-secondary);
+  font: inherit; font-size: 12px; padding: 6px 14px; border-radius: 9px; cursor: pointer; transition: all .15s ease; }
+.ght-tab:hover { color: var(--dsw-alias-label-primary); }
+.ght-tab.active { background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-label-primary-inverted, #fff); font-weight: 500; }
+.ght-paper-title { margin: 0; font-size: 12.5px; line-height: 1.45; font-weight: 500; color: var(--dsw-alias-label-primary);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ght-paper-title a { color: inherit; text-decoration: none; }
+.ght-paper-title a:hover { color: var(--dsw-alias-brand-primary); }
+.ght-topic-dot { width: 6px; height: 6px; border-radius: 50%; }
+
 .ght-empty { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 14px; padding: 18px;
   font-size: 12.5px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-1); }
 .ght-error { color: var(--dsw-alias-state-error-primary); margin: 0 0 8px; font-size: 12.5px; }
@@ -214,6 +250,22 @@ window.__ModuleLoader__.load({
 @media (max-width: 900px) { .ght-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ght-domains { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 620px) { .ght-page { padding: 16px 14px 44px; } .ght-kpis { grid-template-columns: minmax(0, 1fr); } .ght-title { font-size: 22px; } }
 `
+
+    function Tabs(props) {
+      const t = props.t
+      return h('div', { className: 'ght-tabs', role: 'tablist' },
+        h('button', {
+          type: 'button', role: 'tab', 'aria-selected': props.page === 'github',
+          className: `ght-tab${props.page === 'github' ? ' active' : ''}`,
+          onClick: () => { props.setPage('github') },
+        }, t('tabGithub')),
+        h('button', {
+          type: 'button', role: 'tab', 'aria-selected': props.page === 'papers',
+          className: `ght-tab${props.page === 'papers' ? ' active' : ''}`,
+          onClick: () => { props.setPage('papers') },
+        }, t('tabPapers')),
+      )
+    }
 
     function TrendingIcon(props) {
       const size = props && props.size ? props.size : 18
@@ -244,6 +296,37 @@ window.__ModuleLoader__.load({
             fill: 'var(--dsw-alias-brand-primary)', opacity: 0.9 }),
           h('text', { key: `v${item.fullName}`, x: width, y: y + 17, fontSize: 11, textAnchor: 'end',
             fill: 'var(--dsw-alias-label-primary)' }, `+${item.starsToday.toLocaleString()}`),
+        )
+      })
+      return h('svg', { viewBox: `0 0 ${width} ${Math.max(items.length * rowHeight, 1)}`, style: { display: 'block', width: '100%', height: 'auto' }, role: 'img', 'aria-label': props.label }, ...rows)
+    }
+
+    /**
+     * Generic horizontal bars: one row per item.
+     * @param props - items with label/value, the max value, and a value renderer.
+     * @returns the chart.
+     */
+    function HBar(props) {
+      const items = props.items
+      const width = 560
+      const labelWidth = 150
+      const valueWidth = 62
+      const body = width - labelWidth - valueWidth
+      const rowHeight = 26
+      const max = Math.max(1, props.max)
+      const rows = []
+      items.forEach((item, index) => {
+        const y = index * rowHeight
+        const w = Math.max(3, (item.value / max) * body)
+        rows.push(
+          h('text', { key: `n${item.key}`, x: 0, y: y + 17, fontSize: 11.5,
+            fill: index < 3 ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-secondary)' },
+            item.label.length > 24 ? item.label.slice(0, 23) + '…' : item.label),
+          h('rect', { key: `t${item.key}`, x: labelWidth, y: y + 6, width: body, height: 14, rx: 4, fill: 'var(--dsw-alias-bg-layer-2)' }),
+          h('rect', { key: `b${item.key}`, x: labelWidth, y: y + 6, width: w, height: 14, rx: 4,
+            fill: props.color ?? 'var(--dsw-alias-brand-primary)', opacity: 0.9 }),
+          h('text', { key: `v${item.key}`, x: width, y: y + 17, fontSize: 11, textAnchor: 'end', fill: 'var(--dsw-alias-label-primary)' },
+            props.format ? props.format(item.value) : String(item.value)),
         )
       })
       return h('svg', { viewBox: `0 0 ${width} ${Math.max(items.length * rowHeight, 1)}`, style: { display: 'block', width: '100%', height: 'auto' }, role: 'img', 'aria-label': props.label }, ...rows)
@@ -416,7 +499,10 @@ window.__ModuleLoader__.load({
               h('h1', { className: 'ght-title' }, t('title'), data === null ? null : h('span', { className: 'ght-date' }, ` · ${data.day}`)),
               h('p', { className: 'ght-sub' }, t('subtitle')),
             ),
-            h('button', { type: 'button', className: 'ght-btn', disabled: busy, onClick: () => { load(true) } }, t(busy ? 'refreshing' : 'refresh')),
+            h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flex: 'none' } },
+              h(Tabs, { t, page: props.page, setPage: props.setPage }),
+              h('button', { type: 'button', className: 'ght-btn', disabled: busy, onClick: () => { load(true) } }, t(busy ? 'refreshing' : 'refresh')),
+            ),
           ),
           data !== null && h('div', { className: 'ght-kpis' },
             KpiTile('#4d6bfe', String(data.stats.repositories), t('kpiRepos')),
@@ -538,6 +624,201 @@ window.__ModuleLoader__.load({
       )
     }
 
+
+    function Papers(props) {
+      const t = typeof props.t === 'function' ? props.t : (key) => key
+      const [state, setState] = React.useState({ status: 'loading', data: null, error: null })
+      const [topic, setTopic] = React.useState('all')
+      const ticket = React.useRef(0)
+
+      const load = React.useCallback((force) => {
+        const mine = ++ticket.current
+        setState(previous => ({ ...previous, status: previous.data === null ? 'loading' : 'refreshing', error: null }))
+        fetch(`/gh-trending/papers${force ? '?refresh=1' : ''}`, { cache: 'no-store', headers: { accept: 'application/json' } })
+          .then((response) => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            return response.json()
+          })
+          .then((data) => {
+            if (mine !== ticket.current) return
+            if (data === null || typeof data !== 'object' || Array.isArray(data.papers) !== true) {
+              throw new Error(typeof data?.error === 'string' ? data.error : 'unexpected payload')
+            }
+            setState({ status: 'ready', data, error: null })
+          })
+          .catch((error) => {
+            if (mine !== ticket.current) return
+            setState(previous => ({ status: previous.data === null ? 'error' : 'ready', data: previous.data, error: String(error?.message ?? error) }))
+          })
+      }, [])
+
+      React.useEffect(() => { load(false) }, [load])
+
+      const data = state.data
+      const busy = state.status === 'loading' || state.status === 'refreshing'
+      const topics = data === null ? [] : data.domains
+      const zhOf = (paper) => data?.summary?.papers?.[paper.id] ?? null
+      const topicTitle = (key) => {
+        const group = topics.find(entry => entry.key === key)
+        return group === undefined ? key : group.title.zh
+      }
+      const shown = data === null ? [] : (topic === 'all'
+        ? data.papers
+        : (topics.find(group => group.key === topic)?.items ?? []))
+      const topByUpvotes = data === null ? [] : [...data.papers].sort((left, right) => right.upvotes - left.upvotes).slice(0, 10)
+      const donutGroups = topics.map(group => ({
+        key: group.key,
+        label: group.title.zh,
+        color: TOPIC_COLOR[group.key] ?? TOPIC_COLOR.other,
+        value: group.items.reduce((sum, paper) => sum + paper.upvotes, 0),
+      })).filter(group => group.value > 0)
+
+      const PaperCard = (paper, index) => {
+        const tint = TOPIC_COLOR[paper.domain] ?? TOPIC_COLOR.other
+        return h('article', {
+          key: paper.id,
+          className: 'ght-card',
+          style: {
+            background: `linear-gradient(165deg, color-mix(in srgb, ${tint} 12%, var(--dsw-alias-bg-layer-1)), var(--dsw-alias-bg-layer-1) 62%)`,
+            borderColor: `color-mix(in srgb, ${tint} 22%, var(--dsw-alias-border-l1))`,
+          },
+        },
+          h('p', { className: 'ght-paper-title' },
+            h('a', { href: paper.url, target: '_blank', rel: 'noopener noreferrer', title: paper.title }, paper.title),
+          ),
+          h('p', { className: 'ght-desc', style: { WebkitLineClamp: 3, minHeight: 50 }, title: paper.abstract },
+            zhOf(paper) || paper.abstract.slice(0, 200) || t('abstractMissing')),
+          h('div', { className: 'ght-meta' },
+            h('span', { className: 'ght-pill ght-pill-hot' }, `${paper.upvotes} ▲`),
+            paper.ageDays !== null && paper.ageDays !== undefined && h('span', { className: 'ght-pill' }, `${paper.ageDays} ${t('daysAgo')}`),
+            h('span', {
+              className: 'ght-pill ght-pill-domain',
+              style: { background: `color-mix(in srgb, ${tint} 16%, transparent)`, color: tint },
+            }, topicTitle(paper.domain)),
+          ),
+        )
+      }
+
+      return h('div', { className: 'ght-page' },
+        h('header', { className: 'ght-hero' },
+          h('div', { className: 'ght-hero-top' },
+            h('div', null,
+              h('span', { className: 'ght-eyebrow' }, h('i', { className: 'ght-dot' }), t('eyebrow')),
+              h('h1', { className: 'ght-title' }, t('papersTitle'), data === null ? null : h('span', { className: 'ght-date' }, ` · ${data.day}`)),
+              h('p', { className: 'ght-sub' }, t('papersSub')),
+            ),
+            h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flex: 'none' } },
+              h(Tabs, { t, page: props.page, setPage: props.setPage }),
+              h('button', { type: 'button', className: 'ght-btn', disabled: busy, onClick: () => { load(true) } }, t(busy ? 'refreshing' : 'refresh')),
+            ),
+          ),
+          data !== null && h('div', { className: 'ght-kpis' },
+            KpiTile('#7c5cff', String(data.stats.papers), t('kpiPapers')),
+            KpiTile('#4d6bfe', data.stats.upvotes.toLocaleString(), t('kpiUpvotes')),
+            KpiTile('#f0a020', String(data.stats.topUpvotes), t('kpiTop')),
+            KpiTile('#16b8a6', String(data.stats.topics), t('kpiTopics')),
+          ),
+        ),
+
+        state.status === 'loading' && h('div', { className: 'ght-empty', role: 'status' }, t('loading')),
+        state.status === 'error' && h('div', { className: 'ght-empty', role: 'alert' },
+          h('p', { className: 'ght-error' }, `${t('error')}: ${state.error}`),
+          h('button', { type: 'button', className: 'ght-link-btn', onClick: () => { load(true) } }, t('retry')),
+        ),
+
+        data !== null && h('div', { className: 'ght-row' },
+          h('section', { className: 'ght-panel' },
+            h('div', { className: 'ght-panel-head' }, h('h2', { className: 'ght-panel-title' }, t('chartUpvotes')), h('span', { className: 'ght-hint' }, `Top ${topByUpvotes.length}`)),
+            h(HBar, {
+              items: topByUpvotes.map(paper => ({ key: paper.id, label: paper.title, value: paper.upvotes })),
+              max: topByUpvotes.length === 0 ? 1 : topByUpvotes[0].upvotes,
+              label: t('chartUpvotes'),
+              format: value => `${value} ▲`,
+            }),
+          ),
+          h('section', { className: 'ght-panel', style: { flex: '1 1 320px' } },
+            h('div', { className: 'ght-panel-head' }, h('h2', { className: 'ght-panel-title' }, t('chartTopics')), h('span', { className: 'ght-hint' }, String(topics.length))),
+            donutGroups.length === 0
+              ? h('div', { className: 'ght-hint' }, t('noData'))
+              : h(Donut, { groups: donutGroups, caption: t('upvotes'), label: t('chartTopics') }),
+          ),
+        ),
+
+        data !== null && (data.summary?.digest || topics.length > 0) && h('section', { className: 'ght-panel', style: { gap: 10 } },
+          h('div', { className: 'ght-panel-head' }, h('h2', { className: 'ght-panel-title' }, t('digest'))),
+          data.summary?.digest && h('div', { className: 'ght-read' },
+            h('span', { className: 'ght-read-label' }, t('digest')),
+            h('p', { className: 'ght-read-text' }, data.summary.digest),
+          ),
+          !data.summary?.digest && h('div', { className: 'ght-hint' }, t('summaryMissing')),
+        ),
+
+        data !== null && h('section', { className: 'ght-panel' },
+          h('div', { className: 'ght-panel-head' },
+            h('h2', { className: 'ght-panel-title' }, t('mustRead')),
+            h('span', { className: 'ght-hint' }, `${shown.length}`),
+          ),
+          h('div', { className: 'ght-grid' },
+            ...(shown.length === 0
+              ? [h('div', { key: 'empty', className: 'ght-hint' }, t('noData'))]
+              : shown.map(paper => PaperCard(paper))),
+          ),
+        ),
+
+        data !== null && data.freshPapers.length > 0 && h('section', { className: 'ght-panel' },
+          h('div', { className: 'ght-panel-head' },
+            h('h2', { className: 'ght-panel-title' }, t('freshPapers')),
+            h('span', { className: 'ght-hint' }, `${data.freshPapers.length}`),
+          ),
+          ...data.freshPapers.slice(0, 8).map(paper => h('div', { key: paper.id, className: 'ght-li' },
+            h('a', { href: paper.url, target: '_blank', rel: 'noopener noreferrer' }, paper.title.slice(0, 70)),
+            h('span', { title: paper.abstract }, zhOf(paper) || ''),
+            h('b', null, `${paper.upvotes} ▲`),
+          )),
+        ),
+
+        data !== null && topics.length > 0 && h('section', { className: 'ght-panel' },
+          h('div', { className: 'ght-panel-head' }, h('h2', { className: 'ght-panel-title' }, t('byTopic'))),
+          h('div', { className: 'ght-chips' },
+            h('button', { type: 'button', className: `ght-chip${topic === 'all' ? ' active' : ''}`, onClick: () => { setTopic('all') } }, t('all')),
+            ...topics.map(group => h('button', {
+              key: group.key, type: 'button',
+              className: `ght-chip${topic === group.key ? ' active' : ''}`,
+              onClick: () => { setTopic(group.key) },
+            },
+              h('i', { className: 'ght-chip-dot', style: { background: TOPIC_COLOR[group.key] ?? TOPIC_COLOR.other } }),
+              group.title.zh,
+            )),
+          ),
+          topic !== 'all' && typeof data.summary?.domains?.[topic] === 'string'
+            && h('p', { className: 'ght-domain-text' }, data.summary.domains[topic]),
+          h('div', { className: 'ght-domains' },
+            h('div', { className: 'ght-domain' },
+              h('div', { className: 'ght-domain-head' },
+                h('i', { style: { width: 7, height: 7, borderRadius: 3, background: topic === 'all' ? 'var(--dsw-alias-brand-primary)' : (TOPIC_COLOR[topic] ?? TOPIC_COLOR.other) } }),
+                h('span', { className: 'ght-domain-name' }, topic === 'all' ? t('mustRead') : topicTitle(topic)),
+                h('span', { className: 'ght-hint' }, String(shown.length)),
+              ),
+              ...(shown.length === 0
+                ? [h('div', { key: 'e', className: 'ght-hint' }, t('noData'))]
+                : shown.slice(0, 10).map(paper => h('div', { key: paper.id, className: 'ght-li' },
+                    h('a', { href: paper.url, target: '_blank', rel: 'noopener noreferrer' }, paper.title.slice(0, 72)),
+                    h('span', { title: paper.abstract }, zhOf(paper) || ''),
+                    h('b', null, `${paper.upvotes} ▲`),
+                  ))),
+            ),
+          ),
+        ),
+
+        data?.warning && h('div', { className: 'ght-warn' }, `⚠ ${data.warning}`),
+        data !== null && h('footer', { className: 'ght-foot' },
+          h('span', null, `${t('updated')} ${new Date(data.generatedAt).toLocaleTimeString()}`),
+          h('span', null, `${t('source')}: huggingface.co/papers`),
+          h('span', null, data.model),
+        ),
+      )
+    }
+
     return {
       inject: ['slots', 'locale'],
       apply(ctx) {
@@ -554,7 +835,13 @@ window.__ModuleLoader__.load({
         const t = ctx.locale.bind(NS)
         // The `main` seat passes no locale binding, so bind it here and hand the
         // bound translator down; a missing one used to crash the render.
-        const Panel = () => h(Brief, { t })
+        const Home = () => {
+          const [page, setPage] = React.useState('github')
+          return page === 'papers'
+            ? h(Papers, { t, page, setPage })
+            : h(Brief, { t, page, setPage })
+        }
+        const Panel = () => h(Home)
         ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
           name: 'main',
           key: PANEL_ID,

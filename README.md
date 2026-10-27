@@ -5,6 +5,9 @@ an overall leaderboard, per-domain hotspots, and a model-written summary — as 
 
 ## What it adds
 
+- **Two pages under one sidebar entry**: `GitHub` (trending repositories) and `Papers` (recent AI papers).
+- **Papers page**: Hugging Face daily papers ranked by upvotes and recency, topic split, the model's daily read,
+  a Chinese one-liner per paper, a just-submitted list, and a topic picker.
 - **Dashboard**: KPI tiles (repos trending, stars gained, new projects, languages), a bar chart of
   today's star gain, and a donut of the domain split.
 - **Today's hotspots**: the full leaderboard as cards with `+stars`, language and total stars.
@@ -12,8 +15,14 @@ an overall leaderboard, per-domain hotspots, and a model-written summary — as 
   projects, and a Chinese one-liner for every repository shown.
 - **New projects (last 5 days)**: repositories created in the last five days, by stars, with their age.
 - **Browse by domain**: a chip picker that filters both the hotspot board and the new-project board.
+- **`paper_brief` tool**: the paper digest with its Chinese one-liners.
 - **`gh_trending_brief` tool**: the same story for the agent, optionally filtered by `domain`.
 - **`GET /gh-trending/brief[?refresh=1]`**: the JSON the panel reads.
+
+## Data sources
+
+- `github.com/trending?since=daily` (HTML) with the GitHub Search API as a fallback, plus `created:>5d` for new projects.
+- `huggingface.co/api/daily_papers` for the paper page: upvotes, AI keywords, abstract, arXiv id.
 
 ## How it works
 
