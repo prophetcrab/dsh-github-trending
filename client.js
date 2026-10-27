@@ -46,6 +46,7 @@ window.__ModuleLoader__.load({
       source: 'Source',
       fallback: 'search fallback',
       noData: 'Nothing here today.',
+      summaryMissing: 'The model summary is unavailable for this snapshot; retry to rebuild it.',
     }
 
     const zh = {
@@ -79,6 +80,7 @@ window.__ModuleLoader__.load({
       source: '来源',
       fallback: '搜索兜底',
       noData: '今天这个领域没有数据。',
+      summaryMissing: '这一份快照没有模型总结，点「重试」重新生成。',
     }
 
     /** Fixed accent per domain: artwork color, never used for text. */
@@ -95,91 +97,97 @@ window.__ModuleLoader__.load({
     }
 
     const CSS = `
-.ght-page { box-sizing: border-box; max-width: 1120px; margin: 0 auto; padding: 26px 30px 56px; display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
+.ght-page { box-sizing: border-box; width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden;
+  max-width: 1120px; margin: 0 auto; padding: 24px 28px 64px; display: flex; flex-direction: column; gap: 16px;
+  background: radial-gradient(80% 40% at 100% 0%, color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, transparent), transparent 70%),
+              radial-gradient(60% 40% at 0% 100%, color-mix(in srgb, #7c5cff 6%, transparent), transparent 70%),
+              var(--dsw-alias-bg-base); }
 .ght-page *, .ght-page *::before, .ght-page *::after { box-sizing: border-box; }
 
-.ght-hero { position: relative; overflow: hidden; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 20px;
-  padding: 26px 28px; display: flex; flex-direction: column; gap: 18px;
-  background: radial-gradient(130% 150% at 100% 0%, color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent), transparent 60%),
-              radial-gradient(90% 120% at 0% 100%, color-mix(in srgb, #7c5cff 10%, transparent), transparent 65%),
+.ght-hero { position: relative; overflow: hidden; border: 0.5px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, var(--dsw-alias-border-l1));
+  border-radius: 20px; padding: 26px 28px; display: flex; flex-direction: column; gap: 18px;
+  background: radial-gradient(120% 160% at 100% 0%, color-mix(in srgb, var(--dsw-alias-brand-primary) 26%, transparent), transparent 58%),
+              radial-gradient(90% 130% at 0% 110%, color-mix(in srgb, #7c5cff 20%, transparent), transparent 62%),
               var(--dsw-alias-bg-layer-1); }
-.ght-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
-.ght-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--dsw-alias-label-secondary); font-weight: 500; }
+.ght-hero::after { content: ''; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--dsw-alias-brand-primary) 26%, transparent), transparent 68%);
+  filter: blur(18px); pointer-events: none; }
+.ght-hero-top { position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.ght-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--dsw-alias-brand-primary); font-weight: 500; }
 .ght-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-brand-primary);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent); }
-.ght-title { margin: 8px 0 0; font-size: 27px; line-height: 1.15; font-weight: 500; letter-spacing: -0.015em;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, transparent); }
+.ght-title { margin: 8px 0 0; font-size: 28px; line-height: 1.14; font-weight: 500; letter-spacing: -0.02em;
   color: var(--dsw-alias-label-primary); }
 .ght-date { color: var(--dsw-alias-label-tertiary); font-weight: 400; }
-.ght-sub { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--dsw-alias-label-tertiary); max-width: 62ch; }
+.ght-sub { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--dsw-alias-label-secondary); max-width: 62ch; }
 
-.ght-btn { appearance: none; border: 0.5px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; padding: 7px 14px; border-radius: 10px;
-  cursor: pointer; white-space: nowrap; transition: border-color .15s ease, transform .15s ease; }
-.ght-btn:hover:not(:disabled) { border-color: var(--dsw-alias-brand-primary); transform: translateY(-1px); }
+.ght-btn { appearance: none; border: 0.5px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 40%, var(--dsw-alias-border-l1));
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, var(--dsw-alias-bg-layer-1));
+  color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; padding: 7px 15px; border-radius: 10px;
+  cursor: pointer; white-space: nowrap; transition: transform .15s ease, background .15s ease; }
+.ght-btn:hover:not(:disabled) { transform: translateY(-1px); background: color-mix(in srgb, var(--dsw-alias-brand-primary) 20%, var(--dsw-alias-bg-layer-1)); }
 .ght-btn:disabled { opacity: .55; cursor: default; }
 
-.ght-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.ght-kpis { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .ght-kpi { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 14px; padding: 14px 16px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 82%, transparent);
-  display: flex; flex-direction: column; gap: 4px; }
-.ght-kpi-value { font-size: 24px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em;
-  color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; }
-.ght-kpi-label { font-size: 11px; color: var(--dsw-alias-label-tertiary); }
-.ght-kpi-accent .ght-kpi-value { color: var(--dsw-alias-brand-primary); }
+  display: flex; flex-direction: column; gap: 3px; }
+.ght-kpi-value { font-size: 25px; line-height: 1.08; font-weight: 500; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums; }
+.ght-kpi-label { font-size: 11px; color: var(--dsw-alias-label-secondary); }
 
 .ght-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
 .ght-panel { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 18px; background: var(--dsw-alias-bg-layer-1);
   padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; flex: 1 1 420px; }
 .ght-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.ght-panel-title { margin: 0; font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary); }
+.ght-panel-title { margin: 0; font-size: 13.5px; font-weight: 500; color: var(--dsw-alias-label-primary); }
 .ght-hint { font-size: 11.5px; color: var(--dsw-alias-label-tertiary); }
 
-.ght-read { border: 0.5px solid var(--dsw-alias-border-l1); border-left: 3px solid var(--dsw-alias-brand-primary);
-  border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 9%, transparent), transparent 72%),
+.ght-read { border: 0.5px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 30%, var(--dsw-alias-border-l1));
+  border-left: 3px solid var(--dsw-alias-brand-primary); border-radius: 16px; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 8px;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent), transparent 78%),
               var(--dsw-alias-bg-layer-1); }
-.ght-read-label { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--dsw-alias-label-secondary); font-weight: 500; }
-.ght-read-text { margin: 0; font-size: 14px; line-height: 1.8; color: var(--dsw-alias-label-primary); }
+.ght-read-label { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--dsw-alias-brand-primary); font-weight: 500; }
+.ght-read-text { margin: 0; font-size: 15px; line-height: 1.85; color: var(--dsw-alias-label-primary); }
 
-.ght-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.ght-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 10px; }
 .ght-card { position: relative; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 14px;
-  background: var(--dsw-alias-bg-layer-1); padding: 14px 15px; display: flex; flex-direction: column; gap: 7px;
-  min-width: 0; transition: transform .15s ease, border-color .15s ease, background .15s ease; }
-.ght-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, var(--dsw-alias-border-l1));
-  background: var(--dsw-alias-bg-layer-2); }
+  padding: 14px 15px; display: flex; flex-direction: column; gap: 7px; min-width: 0;
+  transition: transform .15s ease, border-color .15s ease; }
+.ght-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 55%, var(--dsw-alias-border-l1)); }
 .ght-card-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ght-rank { flex: none; width: 20px; height: 20px; border-radius: 7px; display: grid; place-items: center;
   font-size: 10.5px; color: var(--dsw-alias-label-tertiary); background: var(--dsw-alias-bg-layer-2);
   font-variant-numeric: tabular-nums; }
-.ght-rank.top { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);
+.ght-rank.top { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, transparent);
   color: var(--dsw-alias-brand-primary); font-weight: 500; }
 .ght-name { font-size: 12.5px; font-weight: 500; color: var(--dsw-alias-label-primary); text-decoration: none;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ght-name:hover { color: var(--dsw-alias-brand-primary); }
 .ght-desc { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--dsw-alias-label-tertiary);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 34px; }
-.ght-meta { display: flex; align-items: center; gap: 8px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary); }
+.ght-meta { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary); flex-wrap: wrap; }
 .ght-pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px;
   border: 0.5px solid var(--dsw-alias-border-l1); }
-.ght-pill-hot { border-color: transparent; background: color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent);
+.ght-pill-hot { border-color: transparent; background: color-mix(in srgb, var(--dsw-alias-brand-primary) 16%, transparent);
   color: var(--dsw-alias-brand-primary); font-variant-numeric: tabular-nums; }
+.ght-pill-domain { border-color: transparent; font-variant-numeric: tabular-nums; }
 .ght-lang-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-label-tertiary); }
 .ght-age { margin-left: auto; color: var(--dsw-alias-label-secondary); }
 
 .ght-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.ght-chip { appearance: none; border: 0.5px solid var(--dsw-alias-border-l1); background: transparent;
-  color: var(--dsw-alias-label-secondary); font: inherit; font-size: 11.5px; padding: 5px 11px; border-radius: 999px;
-  cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: color .15s ease, border-color .15s ease, background .15s ease; }
-.ght-chip:hover { color: var(--dsw-alias-label-primary); border-color: var(--dsw-alias-label-tertiary); }
-.ght-chip.active { color: var(--dsw-alias-label-primary); border-color: transparent;
-  background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-layer-2)); box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l2); }
+.ght-chip { appearance: none; border: 0.5px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary); font: inherit; font-size: 11.5px; padding: 5px 12px; border-radius: 999px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all .15s ease; }
+.ght-chip:hover { color: var(--dsw-alias-label-primary); transform: translateY(-1px); }
+.ght-chip.active { color: var(--dsw-alias-label-primary); border-color: transparent; font-weight: 500; }
 .ght-chip-dot { width: 6px; height: 6px; border-radius: 50%; }
 
 .ght-domains { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.ght-domain { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 14px; background: var(--dsw-alias-bg-layer-1);
-  padding: 15px 17px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.ght-domain { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 14px; padding: 15px 17px;
+  display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 .ght-domain-head { display: flex; align-items: center; gap: 8px; }
 .ght-domain-name { font-size: 12.5px; font-weight: 500; color: var(--dsw-alias-label-primary); flex: 1; }
 .ght-domain-text { margin: 0; font-size: 11.5px; line-height: 1.6; color: var(--dsw-alias-label-secondary); }
@@ -198,7 +206,7 @@ window.__ModuleLoader__.load({
 .ght-warn { font-size: 11.5px; color: var(--dsw-alias-label-secondary); }
 
 @media (max-width: 900px) { .ght-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ght-domains { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 620px) { .ght-page { padding: 18px 16px 40px; } .ght-kpis { grid-template-columns: minmax(0, 1fr); } .ght-title { font-size: 22px; } }
+@media (max-width: 620px) { .ght-page { padding: 16px 14px 44px; } .ght-kpis { grid-template-columns: minmax(0, 1fr); } .ght-title { font-size: 22px; } }
 `
 
     function TrendingIcon(props) {
@@ -269,9 +277,29 @@ window.__ModuleLoader__.load({
       )
     }
 
+    function KpiTile(color, value, label) {
+      return h('div', {
+        className: 'ght-kpi',
+        style: {
+          background: `linear-gradient(160deg, color-mix(in srgb, ${color} 16%, var(--dsw-alias-bg-layer-1)), color-mix(in srgb, ${color} 4%, var(--dsw-alias-bg-layer-1)))`,
+          borderColor: `color-mix(in srgb, ${color} 28%, var(--dsw-alias-border-l1))`,
+        },
+      },
+        h('span', { className: 'ght-kpi-value', style: { color } }, value),
+        h('span', { className: 'ght-kpi-label' }, label),
+      )
+    }
+
     function RepoCard(props) {
+      const tint = DOMAIN_COLOR[props.item.domain] ?? DOMAIN_COLOR.other
       const item = props.item
-      return h('article', { className: 'ght-card' },
+      return h('article', {
+        className: 'ght-card',
+        style: {
+          background: `linear-gradient(165deg, color-mix(in srgb, ${tint} 12%, var(--dsw-alias-bg-layer-1)), var(--dsw-alias-bg-layer-1) 62%)`,
+          borderColor: `color-mix(in srgb, ${tint} 22%, var(--dsw-alias-border-l1))`,
+        },
+      },
         h('div', { className: 'ght-card-top' },
           h('span', { className: `ght-rank${props.index < 3 ? ' top' : ''}` }, String(props.index + 1)),
           h('a', { className: 'ght-name', href: item.url, target: '_blank', rel: 'noopener noreferrer', title: item.fullName }, item.fullName),
@@ -282,13 +310,24 @@ window.__ModuleLoader__.load({
           h('span', null, item.language ?? '—'),
           h('span', { className: 'ght-pill ght-pill-hot' }, `+${item.starsToday.toLocaleString()}`),
           h('span', { className: 'ght-pill' }, `${item.stars.toLocaleString()} ★`),
+          props.domainName && h('span', {
+            className: 'ght-pill ght-pill-domain',
+            style: { background: `color-mix(in srgb, ${tint} 16%, transparent)`, color: tint },
+          }, props.domainName),
         ),
       )
     }
 
     function FreshCard(props) {
       const item = props.item
-      return h('article', { className: 'ght-card' },
+      const tint = DOMAIN_COLOR[item.domain] ?? DOMAIN_COLOR.other
+      return h('article', {
+        className: 'ght-card',
+        style: {
+          background: `linear-gradient(165deg, color-mix(in srgb, ${tint} 12%, var(--dsw-alias-bg-layer-1)), var(--dsw-alias-bg-layer-1) 62%)`,
+          borderColor: `color-mix(in srgb, ${tint} 22%, var(--dsw-alias-border-l1))`,
+        },
+      },
         h('div', { className: 'ght-card-top' },
           h('a', { className: 'ght-name', href: item.url, target: '_blank', rel: 'noopener noreferrer', title: item.fullName }, item.fullName),
         ),
@@ -297,6 +336,10 @@ window.__ModuleLoader__.load({
           item.language && h('span', { className: 'ght-lang-dot' }),
           h('span', null, item.language ?? '—'),
           h('span', { className: 'ght-pill ght-pill-hot' }, `${item.stars.toLocaleString()} ★`),
+          props.domainName && h('span', {
+            className: 'ght-pill ght-pill-domain',
+            style: { background: `color-mix(in srgb, ${tint} 16%, transparent)`, color: tint },
+          }, props.domainName),
           item.ageDays !== null && item.ageDays !== undefined
             && h('span', { className: 'ght-age' }, `${item.ageDays} ${props.daysAgo}`),
         ),
@@ -366,10 +409,10 @@ window.__ModuleLoader__.load({
             h('button', { type: 'button', className: 'ght-btn', disabled: busy, onClick: () => { load(true) } }, t(busy ? 'refreshing' : 'refresh')),
           ),
           data !== null && h('div', { className: 'ght-kpis' },
-            h('div', { className: 'ght-kpi' }, h('span', { className: 'ght-kpi-value' }, String(data.stats.repositories)), h('span', { className: 'ght-kpi-label' }, t('kpiRepos'))),
-            h('div', { className: 'ght-kpi ght-kpi-accent' }, h('span', { className: 'ght-kpi-value' }, data.stats.starsToday.toLocaleString()), h('span', { className: 'ght-kpi-label' }, t('kpiStars'))),
-            h('div', { className: 'ght-kpi' }, h('span', { className: 'ght-kpi-value' }, String(data.stats.freshRepositories ?? fresh.length)), h('span', { className: 'ght-kpi-label' }, t('kpiFresh'))),
-            h('div', { className: 'ght-kpi' }, h('span', { className: 'ght-kpi-value' }, String(data.stats.languages)), h('span', { className: 'ght-kpi-label' }, t('kpiLangs'))),
+            KpiTile('#4d6bfe', String(data.stats.repositories), t('kpiRepos')),
+            KpiTile('#7c5cff', data.stats.starsToday.toLocaleString(), t('kpiStars')),
+            KpiTile('#16b8a6', String(data.stats.freshRepositories ?? fresh.length), t('kpiFresh')),
+            KpiTile('#f0a020', String(data.stats.languages), t('kpiLangs')),
           ),
         ),
 
@@ -400,12 +443,15 @@ window.__ModuleLoader__.load({
           h('div', { className: 'ght-grid' },
             ...(hotItems.length === 0
               ? [h('div', { key: 'empty', className: 'ght-hint' }, t('noData'))]
-              : hotItems.map((item, index) => h(RepoCard, { key: item.fullName, item, index }))),
+              : hotItems.map((item, index) => h(RepoCard, { key: item.fullName, item, index, domainName: item.domain === 'other' ? null : domainTitle(item.domain) }))),
           ),
         ),
 
-        data !== null && (data.summary?.overall || data.summary?.fresh) && h('section', { className: 'ght-panel', style: { gap: 10 } },
-          h('div', { className: 'ght-panel-head' }, h('h2', { className: 'ght-panel-title' }, t('summary'))),
+        data !== null && h('section', { className: 'ght-panel', style: { gap: 10 } },
+          h('div', { className: 'ght-panel-head' },
+            h('h2', { className: 'ght-panel-title' }, t('summary')),
+            !data.summary?.overall && h('button', { type: 'button', className: 'ght-link-btn', onClick: () => { load(true) } }, t('retry')),
+          ),
           data.summary?.overall && h('div', { className: 'ght-read' },
             h('span', { className: 'ght-read-label' }, t('editors')),
             h('p', { className: 'ght-read-text' }, data.summary.overall),
@@ -414,6 +460,7 @@ window.__ModuleLoader__.load({
             h('span', { className: 'ght-read-label' }, t('freshSummary')),
             h('p', { className: 'ght-read-text' }, data.summary.fresh),
           ),
+          !data.summary?.overall && h('div', { className: 'ght-hint' }, t('summaryMissing')),
         ),
 
         data !== null && fresh.length > 0 && h('section', { className: 'ght-panel' },
@@ -422,7 +469,7 @@ window.__ModuleLoader__.load({
             h('span', { className: 'ght-hint' }, `${fresh.length} ${t('repositories')}`),
           ),
           h('div', { className: 'ght-grid' },
-            ...fresh.slice(0, 12).map((item, index) => h(FreshCard, { key: item.fullName, item, index, daysAgo: t('daysAgo') })),
+            ...fresh.slice(0, 12).map((item, index) => h(FreshCard, { key: item.fullName, item, index, daysAgo: t('daysAgo'), domainName: item.domain === 'other' ? null : domainTitle(item.domain) })),
           ),
         ),
 
