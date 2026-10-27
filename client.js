@@ -126,7 +126,7 @@ window.__ModuleLoader__.load({
     }
 
     function Brief(props) {
-      const t = props.t
+      const t = typeof props.t === 'function' ? props.t : (key) => key
       const [state, setState] = React.useState({ status: 'loading', data: null, error: null })
       const ticket = React.useRef(0)
 
@@ -229,10 +229,13 @@ window.__ModuleLoader__.load({
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'github-trending: copy dictionaries')
         const t = ctx.locale.bind(NS)
+        // The `main` seat passes no locale binding, so bind it here and hand
+        // the bound translator down; a missing one used to crash the render.
+        const Panel = () => h(Brief, { t })
         ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
           name: 'main',
           key: PANEL_ID,
-        }, Brief)), 'github-trending: main panel')
+        }, Panel)), 'github-trending: main panel')
         ctx.effect(() => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
           name: 'sidebar.panellist',
           id: PANEL_ID,

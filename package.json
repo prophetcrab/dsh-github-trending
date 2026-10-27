@@ -1,6 +1,6 @@
 {
   "name": "dsh-github-trending",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Daily GitHub trending briefing: an overall leaderboard plus per-domain hotspots, summarized by the model.",
   "license": "MIT",
   "author": "prophetcrab",
@@ -9,7 +9,13 @@
     "type": "git",
     "url": "git+https://github.com/prophetcrab/dsh-github-trending.git"
   },
-  "keywords": ["dsh", "dsh-plugin", "github", "trending", "briefing"],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "github",
+    "trending",
+    "briefing"
+  ],
   "engines": {
     "dsh": ">=0.2.1-rc.2 <0.3.0"
   },
@@ -20,13 +26,23 @@
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
-  "files": ["index.js", "client.js", "cordis.patch.yml", "locale/*.json", "icon.svg"],
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-ui-sidebar"]
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
     }
   }
 }
