@@ -310,7 +310,7 @@ window.__ModuleLoader__.load({
           h('span', { className: `ght-rank${props.index < 3 ? ' top' : ''}` }, String(props.index + 1)),
           h('a', { className: 'ght-name', href: item.url, target: '_blank', rel: 'noopener noreferrer', title: item.fullName }, item.fullName),
         ),
-        h('p', { className: 'ght-desc', title: item.description }, item.description || '—'),
+        h('p', { className: 'ght-desc', title: item.description }, props.zh || item.description || '—'),
         h('div', { className: 'ght-meta' },
           item.language && h('span', { className: 'ght-lang-dot' }),
           h('span', null, item.language ?? '—'),
@@ -337,7 +337,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'ght-card-top' },
           h('a', { className: 'ght-name', href: item.url, target: '_blank', rel: 'noopener noreferrer', title: item.fullName }, item.fullName),
         ),
-        h('p', { className: 'ght-desc', title: item.description }, item.description || '—'),
+        h('p', { className: 'ght-desc', title: item.description }, props.zh || item.description || '—'),
         h('div', { className: 'ght-meta' },
           item.language && h('span', { className: 'ght-lang-dot' }),
           h('span', null, item.language ?? '—'),
@@ -390,6 +390,10 @@ window.__ModuleLoader__.load({
         if (data === null) return key
         const group = [...data.domains, ...freshDomains].find(entry => entry.key === key)
         return group === undefined ? key : group.title.zh
+      }
+      const repoText = (item) => {
+        const text = data?.summary?.repos?.[item.fullName]
+        return typeof text === 'string' && text !== '' ? text : null
       }
       const hotItems = data === null ? [] : (domain === 'all'
         ? data.overall
@@ -449,7 +453,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'ght-grid' },
             ...(hotItems.length === 0
               ? [h('div', { key: 'empty', className: 'ght-hint' }, t('noData'))]
-              : hotItems.map((item, index) => h(RepoCard, { key: item.fullName, item, index, domainName: item.domain === 'other' ? null : domainTitle(item.domain) }))),
+              : hotItems.map((item, index) => h(RepoCard, { key: item.fullName, item, index, zh: repoText(item), domainName: item.domain === 'other' ? null : domainTitle(item.domain) }))),
           ),
         ),
 
@@ -475,7 +479,7 @@ window.__ModuleLoader__.load({
             h('span', { className: 'ght-hint' }, `${fresh.length} ${t('repositories')}`),
           ),
           h('div', { className: 'ght-grid' },
-            ...fresh.slice(0, 12).map((item, index) => h(FreshCard, { key: item.fullName, item, index, daysAgo: t('daysAgo'), domainName: item.domain === 'other' ? null : domainTitle(item.domain) })),
+            ...fresh.slice(0, 12).map((item, index) => h(FreshCard, { key: item.fullName, item, index, daysAgo: t('daysAgo'), zh: repoText(item), domainName: item.domain === 'other' ? null : domainTitle(item.domain) })),
           ),
         ),
 
@@ -503,7 +507,7 @@ window.__ModuleLoader__.load({
                 ? [h('div', { key: 'e', className: 'ght-hint' }, t('noData'))]
                 : hotItems.slice(0, 8).map(item => h('div', { key: item.fullName, className: 'ght-li' },
                     h('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer' }, item.repo),
-                    h('span', { title: item.description }, item.description || ''),
+                    h('span', { title: item.description }, repoText(item) || item.description || ''),
                     h('b', null, `+${item.starsToday}`),
                   ))),
             ),
@@ -517,7 +521,7 @@ window.__ModuleLoader__.load({
                 ? [h('div', { key: 'e', className: 'ght-hint' }, t('noData'))]
                 : freshItems.slice(0, 8).map(item => h('div', { key: item.fullName, className: 'ght-li' },
                     h('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer' }, item.repo),
-                    h('span', { title: item.description }, item.description || ''),
+                    h('span', { title: item.description }, repoText(item) || item.description || ''),
                     h('b', null, `${item.stars.toLocaleString()} ★`),
                   ))),
             ),

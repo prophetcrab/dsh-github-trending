@@ -325,7 +325,12 @@ async function summarize(ctx, config, overall, domains, fresh, freshDomains) {
       language: item.language,
     })),
     domains: Object.fromEntries(domains.map(group => [group.key, group.items.map(item => item.fullName)])),
-    new_projects: fresh.map(item => ({ name: item.fullName, stars: item.stars, age_days: item.ageDays })),
+    new_projects: fresh.map(item => ({
+      name: item.fullName,
+      description: item.description.slice(0, 160),
+      stars: item.stars,
+      age_days: item.ageDays,
+    })),
     new_projects_by_domain: Object.fromEntries(freshDomains.map(group => [group.key, group.items.length])),
   }
   const prompt = [
@@ -334,10 +339,12 @@ async function summarize(ctx, config, overall, domains, fresh, freshDomains) {
     JSON.stringify(compact),
     '',
     'Write it in Chinese. Return JSON only, no markdown fence, with this shape:',
-    '{"overall":"...","domains":{"<domain key>":"..."},"fresh":"..."}',
+    '{"overall":"...","domains":{"<domain key>":"..."},"fresh":"...","repos":{"<owner/name>":"..."}}',
     'Rules: overall at most 140 characters and names the most interesting 2-3 projects; each domain at most 90',
     'characters and states what actually moved today; skip a domain whose list is empty;',
     'fresh at most 110 characters and describes the newly created projects that are already attracting attention;',
+    'repos maps EVERY repository name above to one Chinese sentence of at most 34 characters that says what it is',
+    'and what it is for, in plain words a developer can scan; keep the key exactly as given;',
     'no hype, no emoji, no markdown.',
   ].join('\n')
 
@@ -367,10 +374,17 @@ async function summarize(ctx, config, overall, domains, fresh, freshDomains) {
   if (match === null) return null
   try {
     const parsed = JSON.parse(match[0])
+    const repos = {}
+    if (parsed.repos !== null && typeof parsed.repos === 'object') {
+      for (const [name, text] of Object.entries(parsed.repos)) {
+        if (typeof text === 'string' && text.trim() !== '') repos[name] = text.trim()
+      }
+    }
     return {
       overall: typeof parsed.overall === 'string' ? parsed.overall.trim() : '',
       domains: parsed.domains !== null && typeof parsed.domains === 'object' ? parsed.domains : {},
       fresh: typeof parsed.fresh === 'string' ? parsed.fresh.trim() : '',
+      repos,
     }
   } catch {
     return null
