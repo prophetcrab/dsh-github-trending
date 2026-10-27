@@ -103,6 +103,9 @@ window.__ModuleLoader__.load({
               radial-gradient(60% 40% at 0% 100%, color-mix(in srgb, #7c5cff 6%, transparent), transparent 70%),
               var(--dsw-alias-bg-base); }
 .ght-page *, .ght-page *::before, .ght-page *::after { box-sizing: border-box; }
+/* Keep every block at its natural height: a flex child with overflow:hidden
+   collapses to zero here, which clipped the hero and every panel below it. */
+.ght-page > * { flex: 0 0 auto; min-height: 0; }
 
 .ght-hero { position: relative; overflow: hidden; border: 0.5px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, var(--dsw-alias-border-l1));
   border-radius: 20px; padding: 26px 28px; display: flex; flex-direction: column; gap: 18px;
